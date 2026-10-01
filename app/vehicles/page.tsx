@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { VehicleModal } from '@/components/shared/vehicle-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { WhatsAppModal } from '@/components/shared/whatsapp-modal';
+import { WhatsAppIcon } from '@/components/ui/whatsapp-icon';
 import { RenewalStatusBadge } from '@/components/shared/status-badge';
 import { getDocumentTypeName } from '@/lib/renewals/engine';
 import { normalizeRegistrationNumber } from '@/lib/utils';
@@ -19,7 +21,8 @@ import {
   ShieldCheck,
   AlertCircle,
   Clock,
-  Edit,
+  Pencil,
+  Eye,
   Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -36,6 +39,17 @@ export default function VehiclesPage() {
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [whatsAppData, setWhatsAppData] = useState<{
+    isOpen: boolean;
+    clientName: string;
+    clientMobile: string;
+    registrationNumber: string;
+  }>({
+    isOpen: false,
+    clientName: '',
+    clientMobile: '',
+    registrationNumber: '',
+  });
 
   const activeAgents = users.filter((u) => u.status === 'ACTIVE');
 
@@ -270,30 +284,62 @@ export default function VehiclesPage() {
 
                         <td className="px-5 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* WhatsApp Action Icon Button */}
+                            {owner?.mobile && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  setWhatsAppData({
+                                    isOpen: true,
+                                    clientName: owner.name,
+                                    clientMobile: owner.mobile,
+                                    registrationNumber: veh.registrationNumber,
+                                  })
+                                }
+                                className="h-8 w-8 p-0 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                                title="Chat on WhatsApp"
+                                aria-label="Chat on WhatsApp"
+                              >
+                                <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
+                              </Button>
+                            )}
+
+                            {/* Edit Action Icon Button */}
                             <Button
                               size="sm"
-                              variant="ghost"
+                              variant="outline"
                               onClick={() => setEditingVehicle(veh)}
-                              className="h-7 px-2 text-[11px]"
+                              className="h-8 w-8 p-0 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 border-slate-200"
+                              title="Edit Vehicle"
+                              aria-label="Edit Vehicle"
                             >
-                              Edit
+                              <Pencil className="w-4 h-4" />
                             </Button>
 
-                            <Link href={`/vehicles/${veh.id}`}>
-                              <Button size="sm" variant="secondary" className="h-7 px-2.5 text-[11px] gap-1">
-                                Workspace <ChevronRight className="w-3 h-3" />
+                            {/* Open Workspace Action Icon Button */}
+                            <Link href={`/vehicles/${veh.id}`} title="Open Vehicle Workspace">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 w-8 p-0 rounded-lg text-slate-700 hover:text-blue-700 hover:bg-blue-50 border-slate-200"
+                                aria-label="Open Vehicle Workspace"
+                              >
+                                <Eye className="w-4 h-4" />
                               </Button>
                             </Link>
 
+                            {/* Delete Action Icon Button */}
                             {currentUser?.role === 'ADMIN' && (
                               <Button
                                 size="sm"
-                                variant="ghost"
+                                variant="outline"
                                 onClick={() => setVehicleToDelete(veh)}
-                                className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-slate-200 hover:border-rose-200"
                                 title="Delete Vehicle"
+                                aria-label="Delete Vehicle"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-4 h-4" />
                               </Button>
                             )}
                           </div>
@@ -316,6 +362,15 @@ export default function VehiclesPage() {
           setEditingVehicle(null);
         }}
         initialVehicle={editingVehicle}
+      />
+
+      {/* WhatsApp Modal */}
+      <WhatsAppModal
+        isOpen={whatsAppData.isOpen}
+        onClose={() => setWhatsAppData((prev) => ({ ...prev, isOpen: false }))}
+        clientName={whatsAppData.clientName}
+        clientMobile={whatsAppData.clientMobile}
+        registrationNumber={whatsAppData.registrationNumber}
       />
 
       {/* Delete Confirmation Modal */}

@@ -140,10 +140,10 @@ export default function AgentsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   <Button
                     size="sm"
-                    variant="ghost"
+                    variant="outline"
                     onClick={() => {
                       setEditingAgent(agent);
                       setEditName(agent.name);
@@ -152,20 +152,22 @@ export default function AgentsPage() {
                       setEditRole(agent.role);
                       setEditStatus(agent.status);
                     }}
-                    className="h-7 w-7 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                    className="h-8 w-8 p-0 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 border-slate-200"
                     title="Edit Agent"
+                    aria-label="Edit Agent"
                   >
-                    <Edit className="w-3.5 h-3.5" />
+                    <Edit className="w-4 h-4" />
                   </Button>
                   {agent.id !== currentUser?.id && (
                     <Button
                       size="sm"
-                      variant="ghost"
+                      variant="outline"
                       onClick={() => setAgentToDelete(agent)}
-                      className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                      className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-slate-200 hover:border-rose-200"
                       title="Delete Agent"
+                      aria-label="Delete Agent"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   )}
                 </div>

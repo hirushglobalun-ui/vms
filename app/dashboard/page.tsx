@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Calendar,
   CheckSquare,
+  Eye,
 } from 'lucide-react';
 import Link from 'next/link';
 import { VehicleDocument } from '@/lib/types';
@@ -320,33 +321,40 @@ export default function DashboardPage() {
 
                         <td className="px-5 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            {/* WhatsApp Action Button */}
+                            {/* WhatsApp Action Icon Button */}
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => handleOpenWhatsApp(doc)}
-                              className="h-7 px-2 text-[11px] text-emerald-700 hover:bg-emerald-50 border-emerald-200 gap-1"
+                              className="h-8 w-8 p-0 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
                               title="Send reminder on WhatsApp"
+                              aria-label="Send reminder on WhatsApp"
                             >
-                              <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600" />
-                              WhatsApp
+                              <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
                             </Button>
 
-                            {/* Complete Renewal Button */}
+                            {/* Complete Renewal Icon Button */}
                             <Button
                               size="sm"
-                              variant="secondary"
+                              variant="outline"
                               onClick={() => setCompletionDoc(doc)}
-                              className="h-7 px-2 text-[11px] text-blue-700 hover:bg-blue-50 border border-blue-200 gap-1"
+                              className="h-8 w-8 p-0 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                              title="Complete Renewal Cycle"
+                              aria-label="Complete Renewal Cycle"
                             >
-                              <CheckCircle2 className="w-3 h-3 text-blue-600" />
-                              Renew
+                              <CheckCircle2 className="w-4 h-4" />
                             </Button>
 
+                            {/* View Vehicle Icon Button */}
                             {veh && (
-                              <Link href={`/vehicles/${veh.id}`}>
-                                <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]">
-                                  View
+                              <Link href={`/vehicles/${veh.id}`} title="View Vehicle">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 w-8 p-0 rounded-lg text-slate-700 hover:text-blue-700 hover:bg-blue-50 border-slate-200"
+                                  aria-label="View Vehicle"
+                                >
+                                  <Eye className="w-4 h-4" />
                                 </Button>
                               </Link>
                             )}

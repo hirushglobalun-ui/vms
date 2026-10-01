@@ -18,6 +18,7 @@ import {
   Car,
   User,
   AlertCircle,
+  Pencil,
   Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -206,15 +207,17 @@ export default function TasksPage() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+                    <div className="flex items-center gap-1.5 self-start md:self-auto shrink-0">
                       {task.status !== 'COMPLETED' && (
                         <Button
                           size="sm"
-                          variant="success"
+                          variant="outline"
                           onClick={() => completeTask(task.id, 'Task completed by staff')}
-                          className="h-8 text-xs font-semibold gap-1.5"
+                          className="h-8 w-8 p-0 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                          title="Mark Complete"
+                          aria-label="Mark Complete"
                         >
-                          <CheckCircle2 className="w-4 h-4" /> Mark Complete
+                          <CheckCircle2 className="w-4 h-4" />
                         </Button>
                       )}
 
@@ -222,18 +225,21 @@ export default function TasksPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => setEditingTask(task)}
-                        className="h-8 text-xs"
+                        className="h-8 w-8 p-0 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 border-slate-200"
+                        title="Edit Task & Status"
+                        aria-label="Edit Task & Status"
                       >
-                        Edit / Status
+                        <Pencil className="w-4 h-4" />
                       </Button>
 
                       {currentUser?.role === 'ADMIN' && (
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant="outline"
                           onClick={() => setTaskToDelete(task)}
-                          className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-slate-200 hover:border-rose-200"
                           title="Delete Task"
+                          aria-label="Delete Task"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>

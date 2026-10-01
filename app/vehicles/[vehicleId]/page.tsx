@@ -26,6 +26,7 @@ import {
   AlertCircle,
   Plus,
   Edit,
+  Pencil,
   ArrowLeft,
   FileCheck,
   Shield,
@@ -402,41 +403,49 @@ export default function VehicleDetailPage() {
                                   dueDate: doc.expiryDate,
                                 })
                               }
-                              className="h-7 px-2 text-[11px] text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                              className="h-8 w-8 p-0 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
                               title="Remind client via WhatsApp"
+                              aria-label="Remind client via WhatsApp"
                             >
-                              <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600" />
+                              <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
                             </Button>
                           )}
 
-                          {/* Complete renewal cycle button */}
+                          {/* Complete renewal cycle icon button */}
                           <Button
                             size="sm"
-                            variant="secondary"
+                            variant="outline"
                             onClick={() => setCompletionDoc(doc)}
-                            className="h-7 px-2 text-[11px] text-blue-700 hover:bg-blue-50 border border-blue-200 font-medium"
+                            className="h-8 w-8 p-0 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                            title="Complete Renewal Cycle"
+                            aria-label="Complete Renewal Cycle"
                           >
-                            Complete Renewal
+                            <CheckCircle2 className="w-4 h-4" />
                           </Button>
 
+                          {/* Edit document icon button */}
                           <Button
                             size="sm"
-                            variant="ghost"
+                            variant="outline"
                             onClick={() => setEditingDoc(doc)}
-                            className="h-7 px-2 text-[11px]"
+                            className="h-8 w-8 p-0 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 border-slate-200"
+                            title="Edit Document"
+                            aria-label="Edit Document"
                           >
-                            Edit
+                            <Pencil className="w-4 h-4" />
                           </Button>
 
+                          {/* Delete document icon button */}
                           {currentUser?.role === 'ADMIN' && (
                             <Button
                               size="sm"
-                              variant="ghost"
+                              variant="outline"
                               onClick={() => setDocToDelete(doc)}
-                              className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                              className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-slate-200 hover:border-rose-200"
                               title="Delete Document"
+                              aria-label="Delete Document"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           )}
                         </div>
@@ -509,35 +518,40 @@ export default function VehicleDetailPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <div className="flex items-center gap-1.5 self-start sm:self-auto">
                       {task.status !== 'COMPLETED' && (
                         <Button
                           size="sm"
-                          variant="success"
+                          variant="outline"
                           onClick={() => completeTask(task.id, 'Task marked completed from workspace')}
-                          className="h-7 px-2.5 text-xs font-semibold gap-1"
+                          className="h-8 w-8 p-0 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                          title="Mark Complete"
+                          aria-label="Mark Complete"
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Mark Done
+                          <CheckCircle2 className="w-4 h-4" />
                         </Button>
                       )}
                       <Button
                         size="sm"
-                        variant="ghost"
+                        variant="outline"
                         onClick={() => setEditingTask(task)}
-                        className="h-7 px-2 text-xs"
+                        className="h-8 w-8 p-0 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 border-slate-200"
+                        title="Edit Task"
+                        aria-label="Edit Task"
                       >
-                        Edit
+                        <Pencil className="w-4 h-4" />
                       </Button>
 
                       {currentUser?.role === 'ADMIN' && (
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant="outline"
                           onClick={() => setTaskToDelete(task)}
-                          className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-slate-200 hover:border-rose-200"
                           title="Delete Task"
+                          aria-label="Delete Task"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       )}
                     </div>

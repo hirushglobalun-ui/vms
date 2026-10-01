@@ -304,61 +304,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* 3. DATABASE & CLOUD INTEGRATION STATUS */}
-      <Card>
-        <CardHeader className="py-4">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Server className="w-4 h-4 text-blue-600" />
-            Database & Cloud Integration Status
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-            <div>
-              <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                <Database className="w-3.5 h-3.5 text-blue-600" />
-                {isFirebaseConfigured ? 'Firebase Production Cloud Engine' : 'Production Environment Readiness'}
-              </div>
-              <div className="text-[11px] text-slate-500 mt-1">
-                {isFirebaseConfigured
-                  ? 'Connected to Google Firebase Authentication, Cloud Firestore, and Firebase Storage.'
-                  : 'Centralized environment configuration via NEXT_PUBLIC_FIREBASE_* variables in .env.local.'}
-              </div>
-            </div>
-            <span
-              className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${
-                isFirebaseConfigured
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : 'bg-amber-100 text-amber-800'
-              }`}
-            >
-              {isFirebaseConfigured ? 'CONNECTED' : 'ENV REQUIRED'}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-            <div className="p-3 rounded-lg border border-slate-200/80 bg-slate-50/50">
-              <div className="text-xs font-semibold text-slate-800 flex items-center gap-1.5 mb-1">
-                <Lock className="w-3.5 h-3.5 text-emerald-600" />
-                Security Rules (RBAC)
-              </div>
-              <div className="text-[11px] text-slate-500">
-                Firestore & Storage rules active: Admin full-access, Agent isolated assigned data access.
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg border border-slate-200/80 bg-slate-50/50">
-              <div className="text-xs font-semibold text-slate-800 flex items-center gap-1.5 mb-1">
-                <Server className="w-3.5 h-3.5 text-blue-600" />
-                Cloud Collections
-              </div>
-              <div className="text-[11px] text-slate-500 font-mono">
-                users, clients, vehicles, vehicleDocuments, tasks, notifications, activityLogs, settings
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+     
     </div>
   );
 }

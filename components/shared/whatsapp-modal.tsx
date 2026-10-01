@@ -15,7 +15,7 @@ interface WhatsAppModalProps {
   clientName: string;
   clientMobile: string;
   registrationNumber: string;
-  documentType: DocumentType | string;
+  documentType?: DocumentType | string;
   dueDate?: string;
   vehicleId?: string;
 }
@@ -26,7 +26,7 @@ export function WhatsAppModal({
   clientName,
   clientMobile,
   registrationNumber,
-  documentType,
+  documentType = 'Vehicle Services',
   dueDate,
   vehicleId,
 }: WhatsAppModalProps) {
@@ -39,7 +39,7 @@ export function WhatsAppModal({
       const generated = generateWhatsAppMessage({
         clientName,
         clientMobile,
-        documentType,
+        documentType: documentType || 'Vehicle Services',
         registrationNumber,
         dueDate,
         companyName: settings.companyName,

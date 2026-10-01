@@ -23,7 +23,8 @@ import {
   ChevronRight,
   Clock,
   ArrowUpDown,
-  Edit,
+  Pencil,
+  Eye,
   Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -359,6 +360,7 @@ export default function RenewalsPage() {
 
                         <td className="px-5 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* WhatsApp Action Icon Button */}
                             {client && veh && (
                               <Button
                                 size="sm"
@@ -373,49 +375,64 @@ export default function RenewalsPage() {
                                     dueDate: doc.expiryDate,
                                   })
                                 }
-                                className="h-7 px-2 text-[11px] text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                                className="h-8 w-8 p-0 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
                                 title="Contact via WhatsApp"
+                                aria-label="Contact via WhatsApp"
                               >
-                                <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600" />
+                                <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
                               </Button>
                             )}
 
+                            {/* Complete Renewal Action Icon Button */}
                             <Button
                               size="sm"
-                              variant="secondary"
+                              variant="outline"
                               onClick={() => setCompletionDoc(doc)}
-                              className="h-7 px-2 text-[11px] text-blue-700 hover:bg-blue-50 border border-blue-200 font-medium"
+                              className="h-8 w-8 p-0 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                              title="Complete Renewal Cycle"
+                              aria-label="Complete Renewal Cycle"
                             >
-                              Renew
+                              <CheckCircle2 className="w-4 h-4" />
                             </Button>
 
+                            {/* Edit Document Action Icon Button */}
                             <Button
                               size="sm"
-                              variant="ghost"
+                              variant="outline"
                               onClick={() => setEditingDoc(doc)}
-                              className="h-7 px-2 text-[11px]"
+                              className="h-8 w-8 p-0 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 border-slate-200"
+                              title="Edit Document"
+                              aria-label="Edit Document"
                             >
-                              Edit
+                              <Pencil className="w-4 h-4" />
                             </Button>
 
+                            {/* View Vehicle Action Icon Button */}
+                            {veh && (
+                              <Link href={`/vehicles/${veh.id}`} title="View Vehicle">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 w-8 p-0 rounded-lg text-slate-700 hover:text-blue-700 hover:bg-blue-50 border-slate-200"
+                                  aria-label="View Vehicle"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                              </Link>
+                            )}
+
+                            {/* Delete Document Action Icon Button */}
                             {currentUser?.role === 'ADMIN' && (
                               <Button
                                 size="sm"
-                                variant="ghost"
+                                variant="outline"
                                 onClick={() => setDocToDelete(doc)}
-                                className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-slate-200 hover:border-rose-200"
                                 title="Delete Document"
+                                aria-label="Delete Document"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-4 h-4" />
                               </Button>
-                            )}
-
-                            {veh && (
-                              <Link href={`/vehicles/${veh.id}`}>
-                                <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]">
-                                  View
-                                </Button>
-                              </Link>
                             )}
                           </div>
                         </td>

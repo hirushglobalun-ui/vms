@@ -18,6 +18,8 @@ import {
   Filter,
   UserCheck,
   Trash2,
+  Pencil,
+  Eye,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Client } from '@/lib/types';
@@ -253,6 +255,7 @@ export default function ClientsPage() {
 
                         <td className="px-5 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* WhatsApp Action Icon Button */}
                             <Button
                               size="sm"
                               variant="outline"
@@ -264,36 +267,48 @@ export default function ClientsPage() {
                                   registrationNumber: clientVehs[0]?.registrationNumber || 'Fleet',
                                 })
                               }
-                              className="h-7 px-2 text-[11px] text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                              className="h-8 w-8 p-0 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
                               title="Chat on WhatsApp"
+                              aria-label="Chat on WhatsApp"
                             >
-                              <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600" />
+                              <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
                             </Button>
 
+                            {/* Edit Action Icon Button */}
                             <Button
                               size="sm"
-                              variant="ghost"
+                              variant="outline"
                               onClick={() => setEditingClient(client)}
-                              className="h-7 px-2 text-[11px]"
+                              className="h-8 w-8 p-0 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 border-slate-200"
+                              title="Edit Client"
+                              aria-label="Edit Client"
                             >
-                              Edit
+                              <Pencil className="w-4 h-4" />
                             </Button>
 
-                            <Link href={`/clients/${client.id}`}>
-                              <Button size="sm" variant="secondary" className="h-7 px-2 text-[11px] gap-1">
-                                Details <ChevronRight className="w-3 h-3" />
+                            {/* View Details Action Icon Button */}
+                            <Link href={`/clients/${client.id}`} title="View Client Details">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 w-8 p-0 rounded-lg text-slate-700 hover:text-blue-700 hover:bg-blue-50 border-slate-200"
+                                aria-label="View Client Details"
+                              >
+                                <Eye className="w-4 h-4" />
                               </Button>
                             </Link>
 
+                            {/* Delete Action Icon Button */}
                             {currentUser?.role === 'ADMIN' && (
                               <Button
                                 size="sm"
-                                variant="ghost"
+                                variant="outline"
                                 onClick={() => setClientToDelete(client)}
-                                className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-slate-200 hover:border-rose-200"
                                 title="Delete Client"
+                                aria-label="Delete Client"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-4 h-4" />
                               </Button>
                             )}
                           </div>
