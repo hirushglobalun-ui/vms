@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { AgentDetailModal } from '@/components/shared/agent-detail-modal';
 import { User, UserRole, UserStatus } from '@/lib/types';
 import {
   ShieldCheck,
@@ -38,6 +39,10 @@ export default function AgentsPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [newAgentRole, setNewAgentRole] = useState<UserRole>('AGENT');
   const [isSaving, setIsSaving] = useState(false);
+
+  // View agent detail modal state
+  const [viewingAgent, setViewingAgent] = useState<User | null>(null);
+  const [detailInitialTab, setDetailInitialTab] = useState<'clients' | 'vehicles' | 'tasks' | 'overdues'>('clients');
 
   // Edit agent state
   const [editingAgent, setEditingAgent] = useState<User | null>(null);
@@ -124,12 +129,29 @@ export default function AgentsPage() {
           <Card key={agent.id} className="hover:border-purple-300 transition-colors flex flex-col justify-between">
             <CardHeader className="p-5 pb-3">
               <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    onClick={() => {
+                      setViewingAgent(agent);
+                      setDetailInitialTab('clients');
+                    }}
+                    className="w-11 h-11 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm cursor-pointer hover:bg-purple-200 transition-colors shrink-0 shadow-xs"
+                    title="Click to view full agent profile & details"
+                  >
                     {agent.name.slice(0, 2).toUpperCase()}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-slate-900">{agent.name}</h3>
+                  <div className="min-w-0">
+                    <h3
+                      onClick={() => {
+                        setViewingAgent(agent);
+                        setDetailInitialTab('clients');
+                      }}
+                      className="font-bold text-sm text-slate-900 cursor-pointer hover:text-purple-600 transition-colors truncate flex items-center gap-1 group"
+                      title="Click to view agent details & workload modal"
+                    >
+                      <span className="truncate">{agent.name}</span>
+                      <span className="opacity-0 group-hover:opacity-100 text-purple-500 text-xs transition-opacity">↗</span>
+                    </h3>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span
                         className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase font-mono ${
@@ -145,7 +167,20 @@ export default function AgentsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setViewingAgent(agent);
+                      setDetailInitialTab('clients');
+                    }}
+                    className="h-8 w-8 p-0 rounded-lg text-slate-600 hover:text-purple-600 hover:bg-purple-50 border-slate-200"
+                    title="View Agent Workload & Details"
+                    aria-label="View Agent Details"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -191,31 +226,81 @@ export default function AgentsPage() {
             </CardHeader>
 
             <CardContent className="p-5 pt-0 space-y-3">
-              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-xl text-xs">
-                <div>
+              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl text-xs">
+                <div
+                  onClick={() => {
+                    setViewingAgent(agent);
+                    setDetailInitialTab('clients');
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-white hover:shadow-xs cursor-pointer transition-all border border-transparent hover:border-slate-200"
+                  title="Click to view assigned clients"
+                >
                   <span className="text-slate-400 block font-medium">Assigned Clients</span>
                   <span className="font-bold text-slate-900 text-sm mt-0.5 block">{clientsCount}</span>
                 </div>
-                <div>
+                <div
+                  onClick={() => {
+                    setViewingAgent(agent);
+                    setDetailInitialTab('vehicles');
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-white hover:shadow-xs cursor-pointer transition-all border border-transparent hover:border-slate-200"
+                  title="Click to view managed vehicles"
+                >
                   <span className="text-slate-400 block font-medium">Vehicles Managed</span>
                   <span className="font-bold text-slate-900 text-sm mt-0.5 block">{vehiclesCount}</span>
                 </div>
-                <div>
+                <div
+                  onClick={() => {
+                    setViewingAgent(agent);
+                    setDetailInitialTab('tasks');
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-white hover:shadow-xs cursor-pointer transition-all border border-transparent hover:border-slate-200"
+                  title="Click to view pending tasks"
+                >
                   <span className="text-slate-400 block font-medium">Pending Tasks</span>
                   <span className="font-bold text-amber-700 text-sm mt-0.5 block">{pendingTasks}</span>
                 </div>
-                <div>
+                <div
+                  onClick={() => {
+                    setViewingAgent(agent);
+                    setDetailInitialTab('tasks');
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-white hover:shadow-xs cursor-pointer transition-all border border-transparent hover:border-slate-200"
+                  title="Click to view completed tasks"
+                >
                   <span className="text-slate-400 block font-medium">Completed Tasks</span>
                   <span className="font-bold text-emerald-700 text-sm mt-0.5 block">{completedTasks}</span>
                 </div>
               </div>
 
               {overdueCount > 0 && (
-                <div className="bg-rose-50 border border-rose-200 p-2 rounded-lg text-xs text-rose-800 font-semibold flex items-center gap-1.5">
-                  <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                  {overdueCount} overdue renewal follow-ups
+                <div
+                  onClick={() => {
+                    setViewingAgent(agent);
+                    setDetailInitialTab('overdues');
+                  }}
+                  className="bg-rose-50 hover:bg-rose-100/80 border border-rose-200 p-2 rounded-lg text-xs text-rose-800 font-semibold flex items-center justify-between gap-1.5 cursor-pointer transition-colors"
+                  title="Click to view overdue renewal follow-ups"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    <span>{overdueCount} overdue renewal follow-ups</span>
+                  </div>
+                  <span className="text-[11px] text-rose-700 underline font-medium">View</span>
                 </div>
               )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setViewingAgent(agent);
+                  setDetailInitialTab('clients');
+                }}
+                className="w-full py-1.5 px-3 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-purple-100"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                View Full Details & Workload
+              </button>
             </CardContent>
           </Card>
         ))}
@@ -443,6 +528,22 @@ export default function AgentsPage() {
         message={`Are you sure you want to permanently delete staff member "${agentToDelete?.name}"?`}
         confirmText="Permanently Delete"
         isLoading={isDeleting}
+      />
+
+      {/* Agent Detail Modal */}
+      <AgentDetailModal
+        isOpen={Boolean(viewingAgent)}
+        onClose={() => setViewingAgent(null)}
+        agent={viewingAgent}
+        initialTab={detailInitialTab}
+        onEdit={(agentToEdit) => {
+          setEditingAgent(agentToEdit);
+          setEditName(agentToEdit.name);
+          setEditEmail(agentToEdit.email);
+          setEditMobile(agentToEdit.mobile);
+          setEditRole(agentToEdit.role);
+          setEditStatus(agentToEdit.status);
+        }}
       />
     </div>
   );
