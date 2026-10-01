@@ -36,6 +36,8 @@ import {
   subscribeNotifications,
   markNotificationReadDoc,
   markAllNotificationsReadDoc,
+  clearAllNotificationsDoc,
+  deleteNotificationDoc,
   subscribeActivityLogs,
   addActivityLogDoc,
   subscribeUsers,
@@ -122,6 +124,8 @@ interface AppContextType {
   unreadNotificationCount: number;
   markNotificationAsRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
+  clearAllNotifications: () => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>;
 
   // Settings
   updateSettings: (newSettings: Partial<SystemSettings>) => Promise<void>;
@@ -727,6 +731,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const clearAllNotifications = async () => {
+    if (isFirebaseConfigured && currentUser) {
+      await clearAllNotificationsDoc(currentUser.id);
+    }
+    setNotifications((prev) => {
+      const updated = isAgent ? prev.filter((n) => n.userId !== agentId) : [];
+      saveState('notifications', updated);
+      return updated;
+    });
+  };
+
+  const deleteNotification = async (id: string) => {
+    if (isFirebaseConfigured) {
+      await deleteNotificationDoc(id);
+    }
+    setNotifications((prev) => {
+      const updated = prev.filter((n) => n.id !== id);
+      saveState('notifications', updated);
+      return updated;
+    });
+  };
+
   // SETTINGS
   const updateSettings = async (newSettings: Partial<SystemSettings>) => {
     if (isFirebaseConfigured) {
@@ -863,6 +889,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unreadNotificationCount,
         markNotificationAsRead,
         markAllNotificationsRead,
+        clearAllNotifications,
+        deleteNotification,
         updateSettings,
         filteredClients,
         filteredVehicles,

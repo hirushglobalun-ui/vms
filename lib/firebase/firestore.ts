@@ -467,6 +467,20 @@ export async function markAllNotificationsReadDoc(userId: string): Promise<void>
   await Promise.all(promises);
 }
 
+export async function clearAllNotificationsDoc(userId: string): Promise<void> {
+  if (!isFirebaseConfigured || !db) return;
+  const q = query(collection(db, 'notifications'), where('userId', '==', userId));
+  const snap = await getDocs(q);
+  const promises = snap.docs.map((d) => deleteDoc(d.ref));
+  await Promise.all(promises);
+}
+
+export async function deleteNotificationDoc(notifId: string): Promise<void> {
+  if (!isFirebaseConfigured || !db) return;
+  const ref = doc(db, 'notifications', notifId);
+  await deleteDoc(ref);
+}
+
 // ========================
 // ACTIVITY LOGS
 // ========================

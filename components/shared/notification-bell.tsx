@@ -2,11 +2,18 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '@/lib/store/app-context';
-import { Bell, Check, Clock, AlertTriangle, AlertCircle, FileText } from 'lucide-react';
+import { Bell, Check, Clock, AlertTriangle, AlertCircle, FileText, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 
 export function NotificationBell() {
-  const { filteredNotifications, unreadNotificationCount, markNotificationAsRead, markAllNotificationsRead } = useApp();
+  const {
+    filteredNotifications,
+    unreadNotificationCount,
+    markNotificationAsRead,
+    markAllNotificationsRead,
+    clearAllNotifications,
+    deleteNotification,
+  } = useApp();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -46,14 +53,30 @@ export function NotificationBell() {
                 </span>
               )}
             </div>
-            {unreadNotificationCount > 0 && (
-              <button
-                onClick={markAllNotificationsRead}
-                className="text-[11px] text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
-              >
-                Mark all read
-              </button>
-            )}
+
+            <div className="flex items-center gap-2">
+              {unreadNotificationCount > 0 && (
+                <button
+                  type="button"
+                  onClick={markAllNotificationsRead}
+                  className="text-[11px] text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+                >
+                  Mark all read
+                </button>
+              )}
+
+              {filteredNotifications.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAllNotifications}
+                  className="text-[11px] text-slate-400 hover:text-rose-600 font-medium cursor-pointer flex items-center gap-1 transition-colors"
+                  title="Clear all notifications"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
@@ -66,7 +89,7 @@ export function NotificationBell() {
                 <div
                   key={n.id}
                   onClick={() => markNotificationAsRead(n.id)}
-                  className={`p-3 text-xs transition-colors hover:bg-slate-50 cursor-pointer ${
+                  className={`p-3 text-xs transition-colors hover:bg-slate-50 cursor-pointer group relative ${
                     !n.isRead ? 'bg-blue-50/40' : ''
                   }`}
                 >
@@ -78,7 +101,7 @@ export function NotificationBell() {
                     ) : (
                       <Clock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                     )}
-                    <div className="flex-1">
+                    <div className="flex-1 pr-6">
                       <div className="font-semibold text-slate-900">{n.title}</div>
                       <div className="text-slate-600 mt-0.5 leading-relaxed">{n.message}</div>
                       {n.relatedVehicleId && (
@@ -91,9 +114,24 @@ export function NotificationBell() {
                         </Link>
                       )}
                     </div>
-                    {!n.isRead && (
-                      <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1" />
-                    )}
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {!n.isRead && (
+                        <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteNotification(n.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-slate-100"
+                        title="Dismiss notification"
+                        aria-label="Dismiss notification"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
