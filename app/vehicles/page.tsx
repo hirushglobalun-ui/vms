@@ -8,6 +8,7 @@ import { VehicleModal } from '@/components/shared/vehicle-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { WhatsAppModal } from '@/components/shared/whatsapp-modal';
 import { WhatsAppIcon } from '@/components/ui/whatsapp-icon';
+import { TablePagination } from '@/components/ui/pagination';
 import { RenewalStatusBadge } from '@/components/shared/status-badge';
 import { getDocumentTypeName } from '@/lib/renewals/engine';
 import { normalizeRegistrationNumber } from '@/lib/utils';
@@ -92,6 +93,19 @@ export default function VehiclesPage() {
       return matchesReg || matchesMake || matchesModel || matchesRto || matchesOwner;
     });
   }, [filteredVehicles, selectedAgent, selectedType, selectedStatus, searchTerm, clients]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on filter changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedAgent, selectedType, selectedStatus]);
+
+  const paginatedList = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredList.slice(start, start + pageSize);
+  }, [filteredList, currentPage, pageSize]);
 
   return (
     <div className="space-y-6">
@@ -184,6 +198,7 @@ export default function VehiclesPage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50/70 border-b border-slate-100 text-slate-500 font-semibold uppercase tracking-wider">
                   <tr>
+                    <th className="px-4 py-3 w-16 text-center font-mono">Sl. No.</th>
                     <th className="px-5 py-3">Registration No.</th>
                     <th className="px-4 py-3">Vehicle Details</th>
                     <th className="px-4 py-3">Registered Owner</th>
@@ -194,7 +209,8 @@ export default function VehiclesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredList.map((veh) => {
+                  {paginatedList.map((veh, index) => {
+                    const serialNo = (currentPage - 1) * pageSize + index + 1;
                     const owner = clients.find((c) => c.id === veh.clientId);
                     const agent = users.find((u) => u.id === veh.assignedAgentId);
 
@@ -216,6 +232,9 @@ export default function VehiclesPage() {
 
                     return (
                       <tr key={veh.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-4 py-3.5 text-center font-mono text-xs text-slate-400 font-semibold">
+                          {serialNo}
+                        </td>
                         <td className="px-5 py-3.5">
                           <Link
                             href={`/vehicles/${veh.id}`}
@@ -351,6 +370,14 @@ export default function VehiclesPage() {
               </table>
             </div>
           )}
+
+          <TablePagination
+            currentPage={currentPage}
+            totalItems={filteredList.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
         </CardContent>
       </Card>
 

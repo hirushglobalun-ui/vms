@@ -336,6 +336,7 @@ export default function VehicleDetailPage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50/70 border-b border-slate-100 text-slate-500 font-semibold uppercase tracking-wider">
                   <tr>
+                    <th className="px-4 py-3 w-16 text-center font-mono">Sl. No.</th>
                     <th className="px-5 py-3">Document Category</th>
                     <th className="px-4 py-3">Document / Policy No.</th>
                     <th className="px-4 py-3">Issue / Start Date</th>
@@ -346,8 +347,11 @@ export default function VehicleDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {activeDocs.map((doc) => (
+                  {activeDocs.map((doc, idx) => (
                     <tr key={doc.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-4 py-3.5 text-center font-mono text-xs text-slate-400 font-semibold">
+                        {idx + 1}
+                      </td>
                       <td className="px-5 py-3.5 font-semibold text-slate-900">
                         <div className="flex items-center gap-2">
                           <span>{getDocumentTypeName(doc.documentType)}</span>
@@ -637,6 +641,7 @@ export default function VehicleDetailPage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase tracking-wider">
                   <tr>
+                    <th className="px-4 py-2.5 w-16 text-center font-mono">Sl. No.</th>
                     <th className="px-5 py-2.5">Category</th>
                     <th className="px-4 py-2.5">Doc / Policy No.</th>
                     <th className="px-4 py-2.5">Expired On</th>
@@ -646,8 +651,11 @@ export default function VehicleDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-600">
-                  {historicalDocs.map((h) => (
+                  {historicalDocs.map((h, idx) => (
                     <tr key={h.id}>
+                      <td className="px-4 py-2.5 text-center font-mono text-xs text-slate-400 font-semibold">
+                        {idx + 1}
+                      </td>
                       <td className="px-5 py-2.5 font-medium text-slate-800">
                         {getDocumentTypeName(h.documentType)}
                       </td>

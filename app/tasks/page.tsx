@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { TaskModal } from '@/components/shared/task-modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { TablePagination } from '@/components/ui/pagination';
 import { TaskStatusBadge, PriorityBadge } from '@/components/shared/status-badge';
 import { Task, TaskStatus } from '@/lib/types';
 import {
@@ -58,6 +59,19 @@ export default function TasksPage() {
       return matchesTitle || matchesDesc || matchesVeh || matchesClient;
     });
   }, [filteredTasks, statusFilter, priorityFilter, assignedFilter, searchTerm, vehicles, clients]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on filter changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, priorityFilter, assignedFilter, searchTerm]);
+
+  const paginatedTasks = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredList.slice(start, start + pageSize);
+  }, [filteredList, currentPage, pageSize]);
 
   return (
     <div className="space-y-6">
@@ -149,7 +163,8 @@ export default function TasksPage() {
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {filteredList.map((task) => {
+              {paginatedTasks.map((task, index) => {
+                const serialNo = (currentPage - 1) * pageSize + index + 1;
                 const veh = vehicles.find((v) => v.id === task.vehicleId);
                 const client = clients.find((c) => c.id === task.clientId);
                 const agent = users.find((u) => u.id === task.assignedTo);
@@ -161,6 +176,9 @@ export default function TasksPage() {
                   >
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          #{serialNo}
+                        </span>
                         <span className="font-bold text-sm text-slate-900">{task.title}</span>
                         <PriorityBadge priority={task.priority} />
                         <TaskStatusBadge status={task.status} />
@@ -250,6 +268,14 @@ export default function TasksPage() {
               })}
             </div>
           )}
+
+          <TablePagination
+            currentPage={currentPage}
+            totalItems={filteredList.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
         </CardContent>
       </Card>
 

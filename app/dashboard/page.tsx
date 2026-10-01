@@ -254,6 +254,7 @@ export default function DashboardPage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50/70 border-b border-slate-100 text-slate-500 font-semibold uppercase tracking-wider">
                   <tr>
+                    <th className="px-4 py-3 w-16 text-center font-mono">Sl. No.</th>
                     <th className="px-5 py-3">Vehicle</th>
                     <th className="px-4 py-3">Client</th>
                     <th className="px-4 py-3">Document Type</th>
@@ -263,12 +264,15 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {urgentFollowUps.map((doc) => {
+                  {urgentFollowUps.map((doc, idx) => {
                     const veh = vehicles.find((v) => v.id === doc.vehicleId);
                     const client = clients.find((c) => c.id === doc.clientId);
 
                     return (
                       <tr key={doc.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-4 py-3.5 text-center font-mono text-xs text-slate-400 font-semibold">
+                          {idx + 1}
+                        </td>
                         <td className="px-5 py-3.5 font-medium">
                           {veh ? (
                             <Link

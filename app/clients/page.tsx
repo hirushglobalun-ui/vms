@@ -9,6 +9,7 @@ import { ClientModal } from '@/components/shared/client-modal';
 import { WhatsAppModal } from '@/components/shared/whatsapp-modal';
 import { WhatsAppIcon } from '@/components/ui/whatsapp-icon';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { TablePagination } from '@/components/ui/pagination';
 import {
   Users,
   Plus,
@@ -83,6 +84,19 @@ export default function ClientsPage() {
       return matchesName || matchesPhone || matchesVehicle;
     });
   }, [filteredClients, selectedAgent, selectedStatus, searchTerm, vehicles]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on filter changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedAgent, selectedStatus]);
+
+  const paginatedList = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredList.slice(start, start + pageSize);
+  }, [filteredList, currentPage, pageSize]);
 
   return (
     <div className="space-y-6">
@@ -162,6 +176,7 @@ export default function ClientsPage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50/70 border-b border-slate-100 text-slate-500 font-semibold uppercase tracking-wider">
                   <tr>
+                    <th className="px-4 py-3 w-16 text-center font-mono">Sl. No.</th>
                     <th className="px-5 py-3">Client Profile</th>
                     <th className="px-4 py-3">Contact</th>
                     <th className="px-4 py-3">Owned Vehicles</th>
@@ -172,7 +187,8 @@ export default function ClientsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredList.map((client) => {
+                  {paginatedList.map((client, index) => {
+                    const serialNo = (currentPage - 1) * pageSize + index + 1;
                     const clientVehs = vehicles.filter(
                       (v) => v.clientId === client.id && v.status === 'ACTIVE'
                     );
@@ -187,6 +203,9 @@ export default function ClientsPage() {
 
                     return (
                       <tr key={client.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-4 py-3.5 text-center font-mono text-xs text-slate-400 font-semibold">
+                          {serialNo}
+                        </td>
                         <td className="px-5 py-3.5">
                           <Link
                             href={`/clients/${client.id}`}
@@ -320,6 +339,14 @@ export default function ClientsPage() {
               </table>
             </div>
           )}
+
+          <TablePagination
+            currentPage={currentPage}
+            totalItems={filteredList.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
         </CardContent>
       </Card>
 

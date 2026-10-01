@@ -10,6 +10,7 @@ import { CompletionModal } from '@/components/shared/completion-modal';
 import { DocumentModal } from '@/components/shared/document-modal';
 import { WhatsAppIcon } from '@/components/ui/whatsapp-icon';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { TablePagination } from '@/components/ui/pagination';
 import { getDocumentTypeName, sortDocumentsByUrgency } from '@/lib/renewals/engine';
 import { formatCurrency, normalizeRegistrationNumber } from '@/lib/utils';
 import {
@@ -124,6 +125,19 @@ export default function RenewalsPage() {
     // Sort by priority/urgency (Section 65)
     return sortDocumentsByUrgency(result);
   }, [filteredDocuments, activeTab, selectedDocType, selectedAgent, searchTerm, vehicles, clients]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to page 1 on tab or filter change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, selectedDocType, selectedAgent, searchTerm]);
+
+  const paginatedDocs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAndSortedDocs.slice(start, start + pageSize);
+  }, [filteredAndSortedDocs, currentPage, pageSize]);
 
   return (
     <div className="space-y-6">
@@ -279,6 +293,7 @@ export default function RenewalsPage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50/70 border-b border-slate-100 text-slate-500 font-semibold uppercase tracking-wider">
                   <tr>
+                    <th className="px-4 py-3 w-16 text-center font-mono">Sl. No.</th>
                     <th className="px-5 py-3">Vehicle</th>
                     <th className="px-4 py-3">Client</th>
                     <th className="px-4 py-3">Document</th>
@@ -289,13 +304,17 @@ export default function RenewalsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredAndSortedDocs.map((doc) => {
+                  {paginatedDocs.map((doc, index) => {
+                    const serialNo = (currentPage - 1) * pageSize + index + 1;
                     const veh = vehicles.find((v) => v.id === doc.vehicleId);
                     const client = clients.find((c) => c.id === doc.clientId);
                     const agent = users.find((u) => u.id === veh?.assignedAgentId);
 
                     return (
                       <tr key={doc.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-4 py-3.5 text-center font-mono text-xs text-slate-400 font-semibold">
+                          {serialNo}
+                        </td>
                         <td className="px-5 py-3.5">
                           {veh ? (
                             <Link
@@ -443,6 +462,14 @@ export default function RenewalsPage() {
               </table>
             </div>
           )}
+
+          <TablePagination
+            currentPage={currentPage}
+            totalItems={filteredAndSortedDocs.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
         </CardContent>
       </Card>
 
