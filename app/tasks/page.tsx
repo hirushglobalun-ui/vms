@@ -5,6 +5,7 @@ import { useApp } from '@/lib/store/app-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { TaskModal } from '@/components/shared/task-modal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { TaskStatusBadge, PriorityBadge } from '@/components/shared/status-badge';
 import { Task, TaskStatus } from '@/lib/types';
 import {
@@ -17,11 +18,12 @@ import {
   Car,
   User,
   AlertCircle,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function TasksPage() {
-  const { filteredTasks, vehicles, clients, users, currentUser, updateTask, completeTask } = useApp();
+  const { filteredTasks, vehicles, clients, users, currentUser, updateTask, completeTask, deleteTask } = useApp();
 
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
@@ -29,6 +31,8 @@ export default function TasksPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const activeAgents = users.filter((u) => u.status === 'ACTIVE');
 
@@ -222,6 +226,18 @@ export default function TasksPage() {
                       >
                         Edit / Status
                       </Button>
+
+                      {currentUser?.role === 'ADMIN' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setTaskToDelete(task)}
+                          className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          title="Delete Task"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );
@@ -239,6 +255,26 @@ export default function TasksPage() {
           setEditingTask(null);
         }}
         initialTask={editingTask}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(taskToDelete)}
+        onClose={() => setTaskToDelete(null)}
+        onConfirm={async () => {
+          if (!taskToDelete) return;
+          setIsDeleting(true);
+          try {
+            await deleteTask(taskToDelete.id);
+            setTaskToDelete(null);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        title="Delete Operational Task"
+        message={`Are you sure you want to permanently delete task "${taskToDelete?.title}"?`}
+        confirmText="Delete Task"
+        isLoading={isDeleting}
       />
     </div>
   );

@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
-import { User, UserRole } from '@/lib/types';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { User, UserRole, UserStatus } from '@/lib/types';
 import {
   ShieldCheck,
   UserPlus,
@@ -18,16 +19,32 @@ import {
   Phone,
   Mail,
   ShieldAlert,
+  Edit,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AgentsPage() {
-  const { currentUser, users, clients, vehicles, tasks, documents } = useApp();
+  const { currentUser, users, clients, vehicles, tasks, documents, addAgent, updateAgent, deleteAgent } = useApp();
 
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [newAgentName, setNewAgentName] = useState('');
   const [newAgentEmail, setNewAgentEmail] = useState('');
   const [newAgentMobile, setNewAgentMobile] = useState('');
+  const [newAgentRole, setNewAgentRole] = useState<UserRole>('AGENT');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Edit agent state
+  const [editingAgent, setEditingAgent] = useState<User | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editMobile, setEditMobile] = useState('');
+  const [editRole, setEditRole] = useState<UserRole>('AGENT');
+  const [editStatus, setEditStatus] = useState<UserStatus>('ACTIVE');
+
+  // Delete agent state
+  const [agentToDelete, setAgentToDelete] = useState<User | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Permission Check (Section 7, 9, 10, 88)
   if (currentUser?.role !== 'ADMIN') {
@@ -122,6 +139,36 @@ export default function AgentsPage() {
                     </div>
                   </div>
                 </div>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setEditingAgent(agent);
+                      setEditName(agent.name);
+                      setEditEmail(agent.email);
+                      setEditMobile(agent.mobile);
+                      setEditRole(agent.role);
+                      setEditStatus(agent.status);
+                    }}
+                    className="h-7 w-7 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                    title="Edit Agent"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                  </Button>
+                  {agent.id !== currentUser?.id && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setAgentToDelete(agent)}
+                      className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                      title="Delete Agent"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-100 space-y-1 text-xs text-slate-600">
@@ -176,10 +223,28 @@ export default function AgentsPage() {
         maxWidth="md"
       >
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            alert(`New agent "${newAgentName}" profile created.`);
-            setIsAddUserModalOpen(false);
+            if (!newAgentName.trim() || !newAgentEmail.trim() || !newAgentMobile.trim()) {
+              alert('Please complete all required fields.');
+              return;
+            }
+            setIsSaving(true);
+            try {
+              await addAgent({
+                name: newAgentName.trim(),
+                email: newAgentEmail.trim(),
+                mobile: newAgentMobile.trim(),
+                role: newAgentRole,
+                status: 'ACTIVE',
+              });
+              setNewAgentName('');
+              setNewAgentEmail('');
+              setNewAgentMobile('');
+              setIsAddUserModalOpen(false);
+            } finally {
+              setIsSaving(false);
+            }
           }}
           className="space-y-4"
         >
@@ -208,16 +273,131 @@ export default function AgentsPage() {
             placeholder="e.g. +91 98470 55667"
           />
 
+          <Select
+            label="Role & Access Scope"
+            value={newAgentRole}
+            onChange={(e) => setNewAgentRole(e.target.value as UserRole)}
+            options={[
+              { value: 'AGENT', label: 'Field / Operational Agent' },
+              { value: 'ADMIN', label: 'System Administrator' },
+            ]}
+          />
+
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
             <Button type="button" variant="secondary" onClick={() => setIsAddUserModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary">
+            <Button type="submit" variant="primary" isLoading={isSaving}>
               Register Agent
             </Button>
           </div>
         </form>
       </Modal>
+
+      {/* Edit Agent Modal */}
+      {editingAgent && (
+        <Modal
+          isOpen={Boolean(editingAgent)}
+          onClose={() => setEditingAgent(null)}
+          title="Edit Staff Member"
+          description={`Update profile and permissions for ${editingAgent.name}.`}
+          maxWidth="md"
+        >
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!editingAgent) return;
+              setIsSaving(true);
+              try {
+                await updateAgent(editingAgent.id, {
+                  name: editName.trim(),
+                  email: editEmail.trim(),
+                  mobile: editMobile.trim(),
+                  role: editRole,
+                  status: editStatus,
+                });
+                setEditingAgent(null);
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+            className="space-y-4"
+          >
+            <Input
+              label="Staff Full Name"
+              required
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+            />
+
+            <Input
+              label="Office Email Address"
+              type="email"
+              required
+              value={editEmail}
+              onChange={(e) => setEditEmail(e.target.value)}
+            />
+
+            <Input
+              label="Contact Mobile"
+              required
+              value={editMobile}
+              onChange={(e) => setEditMobile(e.target.value)}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <Select
+                label="Role"
+                value={editRole}
+                onChange={(e) => setEditRole(e.target.value as UserRole)}
+                options={[
+                  { value: 'AGENT', label: 'Field Agent' },
+                  { value: 'ADMIN', label: 'Administrator' },
+                ]}
+              />
+
+              <Select
+                label="Status"
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value as UserStatus)}
+                options={[
+                  { value: 'ACTIVE', label: 'Active' },
+                  { value: 'INACTIVE', label: 'Inactive' },
+                ]}
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button type="button" variant="secondary" onClick={() => setEditingAgent(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" isLoading={isSaving}>
+                Save Changes
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Delete Agent Confirmation */}
+      <ConfirmModal
+        isOpen={Boolean(agentToDelete)}
+        onClose={() => setAgentToDelete(null)}
+        onConfirm={async () => {
+          if (!agentToDelete) return;
+          setIsDeleting(true);
+          try {
+            await deleteAgent(agentToDelete.id);
+            setAgentToDelete(null);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        title="Delete Staff Member"
+        message={`Are you sure you want to permanently delete staff member "${agentToDelete?.name}"?`}
+        confirmText="Permanently Delete"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

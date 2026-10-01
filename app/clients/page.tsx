@@ -7,28 +7,32 @@ import { Input, Select } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { ClientModal } from '@/components/shared/client-modal';
 import { WhatsAppModal } from '@/components/shared/whatsapp-modal';
+import { WhatsAppIcon } from '@/components/ui/whatsapp-icon';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import {
   Users,
   Plus,
   Search,
-  MessageSquare,
   Car,
   ChevronRight,
   Filter,
   UserCheck,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Client } from '@/lib/types';
 import { normalizeRegistrationNumber } from '@/lib/utils';
 
 export default function ClientsPage() {
-  const { filteredClients, vehicles, documents, users, currentUser } = useApp();
+  const { filteredClients, vehicles, documents, users, currentUser, deleteClient } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAgent, setSelectedAgent] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [whatsAppData, setWhatsAppData] = useState<{
     isOpen: boolean;
@@ -263,7 +267,7 @@ export default function ClientsPage() {
                               className="h-7 px-2 text-[11px] text-emerald-700 hover:bg-emerald-50 border-emerald-200"
                               title="Chat on WhatsApp"
                             >
-                              <MessageSquare className="w-3 h-3 text-emerald-600" />
+                              <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600" />
                             </Button>
 
                             <Button
@@ -280,6 +284,18 @@ export default function ClientsPage() {
                                 Details <ChevronRight className="w-3 h-3" />
                               </Button>
                             </Link>
+
+                            {currentUser?.role === 'ADMIN' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setClientToDelete(client)}
+                                className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                title="Delete Client"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -309,6 +325,26 @@ export default function ClientsPage() {
         clientMobile={whatsAppData.clientMobile}
         registrationNumber={whatsAppData.registrationNumber}
         documentType="Vehicle Compliance"
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(clientToDelete)}
+        onClose={() => setClientToDelete(null)}
+        onConfirm={async () => {
+          if (!clientToDelete) return;
+          setIsDeleting(true);
+          try {
+            await deleteClient(clientToDelete.id);
+            setClientToDelete(null);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        title="Delete Client Record"
+        message={`Are you sure you want to permanently delete client "${clientToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Permanently Delete"
+        isLoading={isDeleting}
       />
     </div>
   );

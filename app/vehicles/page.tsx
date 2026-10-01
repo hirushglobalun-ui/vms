@@ -5,6 +5,7 @@ import { useApp } from '@/lib/store/app-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { VehicleModal } from '@/components/shared/vehicle-modal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { RenewalStatusBadge } from '@/components/shared/status-badge';
 import { getDocumentTypeName } from '@/lib/renewals/engine';
 import { normalizeRegistrationNumber } from '@/lib/utils';
@@ -18,18 +19,23 @@ import {
   ShieldCheck,
   AlertCircle,
   Clock,
+  Edit,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
-import { VehicleType } from '@/lib/types';
+import { Vehicle, VehicleType } from '@/lib/types';
 
 export default function VehiclesPage() {
-  const { filteredVehicles, clients, documents, users, currentUser } = useApp();
+  const { filteredVehicles, clients, documents, users, currentUser, deleteVehicle } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAgent, setSelectedAgent] = useState('ALL');
   const [selectedType, setSelectedType] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [isAddVehicleModalOpen, setIsAddVehicleModalOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const activeAgents = users.filter((u) => u.status === 'ACTIVE');
 
@@ -263,11 +269,34 @@ export default function VehiclesPage() {
                         </td>
 
                         <td className="px-5 py-3.5 text-right">
-                          <Link href={`/vehicles/${veh.id}`}>
-                            <Button size="sm" variant="secondary" className="h-7 px-2.5 text-[11px] gap-1">
-                              Workspace <ChevronRight className="w-3 h-3" />
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setEditingVehicle(veh)}
+                              className="h-7 px-2 text-[11px]"
+                            >
+                              Edit
                             </Button>
-                          </Link>
+
+                            <Link href={`/vehicles/${veh.id}`}>
+                              <Button size="sm" variant="secondary" className="h-7 px-2.5 text-[11px] gap-1">
+                                Workspace <ChevronRight className="w-3 h-3" />
+                              </Button>
+                            </Link>
+
+                            {currentUser?.role === 'ADMIN' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setVehicleToDelete(veh)}
+                                className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                title="Delete Vehicle"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -281,8 +310,32 @@ export default function VehiclesPage() {
 
       {/* Modal */}
       <VehicleModal
-        isOpen={isAddVehicleModalOpen}
-        onClose={() => setIsAddVehicleModalOpen(false)}
+        isOpen={isAddVehicleModalOpen || Boolean(editingVehicle)}
+        onClose={() => {
+          setIsAddVehicleModalOpen(false);
+          setEditingVehicle(null);
+        }}
+        initialVehicle={editingVehicle}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(vehicleToDelete)}
+        onClose={() => setVehicleToDelete(null)}
+        onConfirm={async () => {
+          if (!vehicleToDelete) return;
+          setIsDeleting(true);
+          try {
+            await deleteVehicle(vehicleToDelete.id);
+            setVehicleToDelete(null);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        title="Delete Vehicle Record"
+        message={`Are you sure you want to permanently delete vehicle "${vehicleToDelete?.registrationNumber}" (${vehicleToDelete?.make} ${vehicleToDelete?.model})? All linked documents and history will be affected.`}
+        confirmText="Permanently Delete"
+        isLoading={isDeleting}
       />
     </div>
   );

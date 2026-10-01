@@ -5,7 +5,8 @@ import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { buildWhatsAppUrl, generateWhatsAppMessage } from '@/lib/whatsapp';
 import { useApp } from '@/lib/store/app-context';
-import { MessageSquare, ExternalLink, Copy, Check } from 'lucide-react';
+import { WhatsAppIcon } from '@/components/ui/whatsapp-icon';
+import { ExternalLink, Copy, Check } from 'lucide-react';
 import { DocumentType } from '@/lib/types';
 
 interface WhatsAppModalProps {
@@ -115,7 +116,7 @@ export function WhatsAppModal({
               onClick={handleOpenWhatsApp}
               className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-sm"
             >
-              <MessageSquare className="w-4 h-4" />
+              <WhatsAppIcon className="w-4 h-4 text-white" />
               Open in WhatsApp
               <ExternalLink className="w-3.5 h-3.5" />
             </Button>

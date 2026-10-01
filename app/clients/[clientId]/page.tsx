@@ -10,6 +10,8 @@ import { VehicleModal } from '@/components/shared/vehicle-modal';
 import { WhatsAppModal } from '@/components/shared/whatsapp-modal';
 import { RenewalStatusBadge } from '@/components/shared/status-badge';
 import { getDocumentTypeName } from '@/lib/renewals/engine';
+import { WhatsAppIcon } from '@/components/ui/whatsapp-icon';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import {
   Users,
   Car,
@@ -18,13 +20,13 @@ import {
   MapPin,
   Plus,
   Edit,
-  MessageSquare,
   ArrowLeft,
   Calendar,
   AlertCircle,
   ShieldCheck,
   ShieldAlert,
   CheckCircle2,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -33,10 +35,12 @@ export default function ClientDetailPage() {
   const router = useRouter();
   const clientId = params?.clientId as string;
 
-  const { clients, vehicles, documents, users, currentUser } = useApp();
+  const { clients, vehicles, documents, users, currentUser, deleteClient } = useApp();
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddVehicleModalOpen, setIsAddVehicleModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [whatsAppData, setWhatsAppData] = useState<{
     isOpen: boolean;
     clientName: string;
@@ -172,7 +176,7 @@ export default function ClientDetailPage() {
             }
             className="text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50 gap-1.5"
           >
-            <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+            <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600" />
             WhatsApp
           </Button>
 
@@ -185,6 +189,18 @@ export default function ClientDetailPage() {
             <Edit className="w-3.5 h-3.5" />
             Edit Profile
           </Button>
+
+          {currentUser?.role === 'ADMIN' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDeleteModalOpen(true)}
+              className="text-xs text-rose-600 border-rose-200 hover:bg-rose-50 gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              Delete Client
+            </Button>
+          )}
 
           <Button
             variant="primary"
@@ -337,6 +353,24 @@ export default function ClientDetailPage() {
         clientMobile={whatsAppData.clientMobile}
         registrationNumber={whatsAppData.registrationNumber}
         documentType={whatsAppData.documentType}
+      />
+
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={async () => {
+          setIsDeleting(true);
+          try {
+            await deleteClient(client.id);
+            router.push('/clients');
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        title="Delete Client Record"
+        message={`Are you sure you want to delete client "${client.name}"? This action cannot be undone.`}
+        confirmText="Permanently Delete"
+        isLoading={isDeleting}
       />
     </div>
   );

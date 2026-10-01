@@ -8,13 +8,14 @@ import { RenewalStatusBadge } from '@/components/shared/status-badge';
 import { WhatsAppModal } from '@/components/shared/whatsapp-modal';
 import { CompletionModal } from '@/components/shared/completion-modal';
 import { DocumentModal } from '@/components/shared/document-modal';
+import { WhatsAppIcon } from '@/components/ui/whatsapp-icon';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { getDocumentTypeName, sortDocumentsByUrgency } from '@/lib/renewals/engine';
 import { formatCurrency, normalizeRegistrationNumber } from '@/lib/utils';
 import {
   RotateCcw,
   Search,
   Filter,
-  MessageSquare,
   CheckCircle2,
   Calendar,
   AlertCircle,
@@ -22,12 +23,14 @@ import {
   ChevronRight,
   Clock,
   ArrowUpDown,
+  Edit,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { DocumentType, RenewalStatus, VehicleDocument } from '@/lib/types';
 
 export default function RenewalsPage() {
-  const { filteredDocuments, vehicles, clients, users, currentUser } = useApp();
+  const { filteredDocuments, vehicles, clients, users, currentUser, deleteDocument } = useApp();
 
   const [activeTab, setActiveTab] = useState<'ALL' | 'OVERDUE' | 'DUE_TODAY' | 'DUE_SOON' | 'COMPLETED'>('ALL');
   const [selectedDocType, setSelectedDocType] = useState<string>('ALL');
@@ -37,6 +40,8 @@ export default function RenewalsPage() {
   // Modals
   const [completionDoc, setCompletionDoc] = useState<VehicleDocument | null>(null);
   const [editingDoc, setEditingDoc] = useState<VehicleDocument | null>(null);
+  const [docToDelete, setDocToDelete] = useState<VehicleDocument | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [whatsAppData, setWhatsAppData] = useState<{
     isOpen: boolean;
     clientName: string;
@@ -371,7 +376,7 @@ export default function RenewalsPage() {
                                 className="h-7 px-2 text-[11px] text-emerald-700 hover:bg-emerald-50 border-emerald-200"
                                 title="Contact via WhatsApp"
                               >
-                                <MessageSquare className="w-3 h-3 text-emerald-600" />
+                                <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600" />
                               </Button>
                             )}
 
@@ -383,6 +388,27 @@ export default function RenewalsPage() {
                             >
                               Renew
                             </Button>
+
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setEditingDoc(doc)}
+                              className="h-7 px-2 text-[11px]"
+                            >
+                              Edit
+                            </Button>
+
+                            {currentUser?.role === 'ADMIN' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDocToDelete(doc)}
+                                className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                title="Delete Document"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
 
                             {veh && (
                               <Link href={`/vehicles/${veh.id}`}>
@@ -423,6 +449,36 @@ export default function RenewalsPage() {
         registrationNumber={whatsAppData.registrationNumber}
         documentType={whatsAppData.documentType}
         dueDate={whatsAppData.dueDate}
+      />
+      {/* Edit Document Modal */}
+      {editingDoc && (
+        <DocumentModal
+          isOpen={Boolean(editingDoc)}
+          onClose={() => setEditingDoc(null)}
+          vehicleId={editingDoc.vehicleId}
+          clientId={editingDoc.clientId}
+          initialDocument={editingDoc}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(docToDelete)}
+        onClose={() => setDocToDelete(null)}
+        onConfirm={async () => {
+          if (!docToDelete) return;
+          setIsDeleting(true);
+          try {
+            await deleteDocument(docToDelete.id);
+            setDocToDelete(null);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        title="Delete Compliance Document"
+        message={`Are you sure you want to permanently delete document "${docToDelete?.documentType}" (#${docToDelete?.documentNumber || 'N/A'})?`}
+        confirmText="Delete Document"
+        isLoading={isDeleting}
       />
     </div>
   );

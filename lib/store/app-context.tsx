@@ -18,23 +18,30 @@ import {
   subscribeClients,
   addClientDoc,
   updateClientDoc,
+  deleteClientDoc,
   subscribeVehicles,
   addVehicleDoc,
   updateVehicleDoc,
+  deleteVehicleDoc,
   subscribeDocuments,
   addVehicleDocumentDoc,
   updateVehicleDocumentDoc,
+  deleteDocumentDoc,
   completeRenewalCycleDoc,
   subscribeTasks,
   addTaskDoc,
   updateTaskDoc,
   completeTaskDoc,
+  deleteTaskDoc,
   subscribeNotifications,
   markNotificationReadDoc,
   markAllNotificationsReadDoc,
   subscribeActivityLogs,
   addActivityLogDoc,
   subscribeUsers,
+  addUserDoc,
+  updateUserDoc,
+  deleteUserDoc,
   getSystemSettingsDoc,
   updateSystemSettingsDoc,
 } from '../firebase/firestore';
@@ -74,15 +81,18 @@ interface AppContextType {
   addClient: (client: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => Promise<string>;
   updateClient: (id: string, updates: Partial<Client>) => Promise<void>;
   deactivateClient: (id: string) => Promise<void>;
+  deleteClient: (id: string) => Promise<void>;
 
   // Vehicle operations
   addVehicle: (vehicle: Omit<Vehicle, 'id' | 'normalizedRegistrationNumber' | 'createdAt' | 'updatedAt' | 'createdBy'>) => Promise<string>;
   updateVehicle: (id: string, updates: Partial<Vehicle>) => Promise<void>;
   deactivateVehicle: (id: string) => Promise<void>;
+  deleteVehicle: (id: string) => Promise<void>;
 
   // Document operations
   addDocument: (doc: Omit<VehicleDocument, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'createdBy'>) => Promise<string>;
   updateDocument: (id: string, updates: Partial<VehicleDocument>) => Promise<void>;
+  deleteDocument: (id: string) => Promise<void>;
   completeRenewalCycle: (
     oldDocumentId: string,
     newDetails: {
@@ -101,6 +111,12 @@ interface AppContextType {
   addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>) => Promise<string>;
   updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
   completeTask: (id: string, notes?: string) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
+
+  // Staff / Agent operations
+  addAgent: (agent: Omit<User, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  updateAgent: (id: string, updates: Partial<User>) => Promise<void>;
+  deleteAgent: (id: string) => Promise<void>;
 
   // Notifications
   unreadNotificationCount: number;
@@ -409,6 +425,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await updateVehicle(id, { status: 'INACTIVE' });
   };
 
+  const deleteClient = async (id: string) => {
+    if (isFirebaseConfigured) {
+      await deleteClientDoc(id);
+    } else {
+      setClients((prev) => {
+        const updated = prev.filter((c) => c.id !== id);
+        saveState('clients', updated);
+        return updated;
+      });
+    }
+  };
+
+  const deleteVehicle = async (id: string) => {
+    if (isFirebaseConfigured) {
+      await deleteVehicleDoc(id);
+    } else {
+      setVehicles((prev) => {
+        const updated = prev.filter((v) => v.id !== id);
+        saveState('vehicles', updated);
+        return updated;
+      });
+    }
+  };
+
+  const deleteDocument = async (id: string) => {
+    if (isFirebaseConfigured) {
+      await deleteDocumentDoc(id);
+    } else {
+      setDocuments((prev) => {
+        const updated = prev.filter((d) => d.id !== id);
+        saveState('documents', updated);
+        return updated;
+      });
+    }
+  };
+
   // DOCUMENTS CRUD
   const addDocument = async (
     docData: Omit<VehicleDocument, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'createdBy'>
@@ -594,6 +646,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const deleteTask = async (id: string) => {
+    if (isFirebaseConfigured) {
+      await deleteTaskDoc(id);
+    } else {
+      setTasks((prev) => {
+        const updated = prev.filter((t) => t.id !== id);
+        saveState('tasks', updated);
+        return updated;
+      });
+    }
+  };
+
+  const addAgent = async (agentData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+    if (isFirebaseConfigured) {
+      return await addUserDoc(agentData);
+    } else {
+      const id = `user_${Date.now()}`;
+      const newAgent: User = {
+        ...agentData,
+        id,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setUsers((prev) => {
+        const updated = [newAgent, ...prev];
+        saveState('users', updated);
+        return updated;
+      });
+      return id;
+    }
+  };
+
+  const updateAgent = async (id: string, updates: Partial<User>) => {
+    if (isFirebaseConfigured) {
+      await updateUserDoc(id, updates);
+    } else {
+      setUsers((prev) => {
+        const updated = prev.map((u) => (u.id === id ? { ...u, ...updates, updatedAt: new Date().toISOString() } : u));
+        saveState('users', updated);
+        return updated;
+      });
+    }
+  };
+
+  const deleteAgent = async (id: string) => {
+    if (isFirebaseConfigured) {
+      await deleteUserDoc(id);
+    } else {
+      setUsers((prev) => {
+        const updated = prev.filter((u) => u.id !== id);
+        saveState('users', updated);
+        return updated;
+      });
+    }
+  };
+
   // NOTIFICATIONS
   const markNotificationAsRead = async (id: string) => {
     if (isFirebaseConfigured) {
@@ -736,15 +844,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addClient,
         updateClient,
         deactivateClient,
+        deleteClient,
         addVehicle,
         updateVehicle,
         deactivateVehicle,
+        deleteVehicle,
         addDocument,
         updateDocument,
+        deleteDocument,
         completeRenewalCycle,
         addTask,
         updateTask,
         completeTask,
+        deleteTask,
+        addAgent,
+        updateAgent,
+        deleteAgent,
         unreadNotificationCount,
         markNotificationAsRead,
         markAllNotificationsRead,

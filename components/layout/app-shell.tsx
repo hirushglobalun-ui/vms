@@ -62,7 +62,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <Sidebar className="w-full h-full border-r-0" />
+            <Sidebar
+              className="w-full h-full border-r-0"
+              onNavigate={() => setMobileMenuOpen(false)}
+            />
           </div>
         </div>
       )}

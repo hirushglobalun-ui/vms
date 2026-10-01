@@ -9,6 +9,7 @@ import { WhatsAppModal } from '@/components/shared/whatsapp-modal';
 import { CompletionModal } from '@/components/shared/completion-modal';
 import { TaskModal } from '@/components/shared/task-modal';
 import { getDocumentTypeName } from '@/lib/renewals/engine';
+import { WhatsAppIcon } from '@/components/ui/whatsapp-icon';
 import {
   Users,
   Car,
@@ -16,7 +17,6 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
-  MessageSquare,
   ArrowRight,
   ShieldCheck,
   Calendar,
@@ -328,7 +328,7 @@ export default function DashboardPage() {
                               className="h-7 px-2 text-[11px] text-emerald-700 hover:bg-emerald-50 border-emerald-200 gap-1"
                               title="Send reminder on WhatsApp"
                             >
-                              <MessageSquare className="w-3 h-3 text-emerald-600" />
+                              <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600" />
                               WhatsApp
                             </Button>
 

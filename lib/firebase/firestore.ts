@@ -6,6 +6,7 @@ import {
   setDoc,
   addDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -88,6 +89,11 @@ export async function updateClientDoc(
   });
 }
 
+export async function deleteClientDoc(clientId: string): Promise<void> {
+  if (!isFirebaseConfigured || !db) throw new Error('Firestore not configured.');
+  await deleteDoc(doc(db, 'clients', clientId));
+}
+
 // ========================
 // VEHICLES
 // ========================
@@ -164,6 +170,11 @@ export async function updateVehicleDoc(
   await updateDoc(ref, payload);
 }
 
+export async function deleteVehicleDoc(vehicleId: string): Promise<void> {
+  if (!isFirebaseConfigured || !db) throw new Error('Firestore not configured.');
+  await deleteDoc(doc(db, 'vehicles', vehicleId));
+}
+
 // ========================
 // DOCUMENTS
 // ========================
@@ -228,6 +239,13 @@ export async function updateVehicleDocumentDoc(
 
   await updateDoc(ref, payload);
 }
+
+export async function deleteDocumentDoc(docId: string): Promise<void> {
+  if (!isFirebaseConfigured || !db) throw new Error('Firestore not configured.');
+  await deleteDoc(doc(db, 'vehicleDocuments', docId));
+}
+
+export const updateDocumentDoc = updateVehicleDocumentDoc;
 
 /**
  * Completes renewal cycle preserving history (Section 11, 69, 70):
@@ -404,6 +422,11 @@ export async function completeTaskDoc(
   });
 }
 
+export async function deleteTaskDoc(taskId: string): Promise<void> {
+  if (!isFirebaseConfigured || !db) throw new Error('Firestore not configured.');
+  await deleteDoc(doc(db, 'tasks', taskId));
+}
+
 // ========================
 // NOTIFICATIONS
 // ========================
@@ -509,6 +532,38 @@ export async function getSystemSettingsDoc(): Promise<SystemSettings | null> {
   return null;
 }
 
+export async function addUserDoc(
+  userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>,
+  customId?: string
+): Promise<string> {
+  if (!isFirebaseConfigured || !db) throw new Error('Firestore not configured.');
+  const id = customId || `user_${Date.now()}`;
+  const now = new Date().toISOString();
+  await setDoc(doc(db, 'users', id), {
+    ...userData,
+    id,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return id;
+}
+
+export async function updateUserDoc(
+  userId: string,
+  updates: Partial<User>
+): Promise<void> {
+  if (!isFirebaseConfigured || !db) throw new Error('Firestore not configured.');
+  await updateDoc(doc(db, 'users', userId), {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export async function deleteUserDoc(userId: string): Promise<void> {
+  if (!isFirebaseConfigured || !db) throw new Error('Firestore not configured.');
+  await deleteDoc(doc(db, 'users', userId));
+}
+
 export async function updateSystemSettingsDoc(
   settings: Partial<SystemSettings>
 ): Promise<void> {
@@ -516,3 +571,4 @@ export async function updateSystemSettingsDoc(
   const ref = doc(db, 'settings', 'system');
   await setDoc(ref, settings, { merge: true });
 }
+

@@ -10,6 +10,8 @@ import { DocumentModal } from '@/components/shared/document-modal';
 import { CompletionModal } from '@/components/shared/completion-modal';
 import { TaskModal } from '@/components/shared/task-modal';
 import { WhatsAppModal } from '@/components/shared/whatsapp-modal';
+import { WhatsAppIcon } from '@/components/ui/whatsapp-icon';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { RenewalStatusBadge, TaskStatusBadge, PriorityBadge } from '@/components/shared/status-badge';
 import { getDocumentTypeName } from '@/lib/renewals/engine';
 import { formatCurrency } from '@/lib/utils';
@@ -24,7 +26,6 @@ import {
   AlertCircle,
   Plus,
   Edit,
-  MessageSquare,
   ArrowLeft,
   FileCheck,
   Shield,
@@ -33,8 +34,10 @@ import {
   ExternalLink,
   History,
   CheckSquare,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { VehicleDocument } from '@/lib/types';
 
 export default function VehicleDetailPage() {
@@ -51,15 +54,24 @@ export default function VehicleDetailPage() {
     currentUser,
     updateTask,
     completeTask,
+    deleteVehicle,
+    deleteDocument,
+    deleteTask,
   } = useApp();
+
+  const router = useRouter();
 
   // Modals state
   const [isEditVehicleModalOpen, setIsEditVehicleModalOpen] = useState(false);
+  const [isDeleteVehicleModalOpen, setIsDeleteVehicleModalOpen] = useState(false);
   const [isAddDocModalOpen, setIsAddDocModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<VehicleDocument | null>(null);
+  const [docToDelete, setDocToDelete] = useState<VehicleDocument | null>(null);
   const [completionDoc, setCompletionDoc] = useState<VehicleDocument | null>(null);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
+  const [taskToDelete, setTaskToDelete] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [whatsAppData, setWhatsAppData] = useState<{
     isOpen: boolean;
@@ -201,7 +213,7 @@ export default function VehicleDetailPage() {
               }
               className="text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50 gap-1.5"
             >
-              <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+              <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600" />
               WhatsApp Client
             </Button>
           )}
@@ -215,6 +227,18 @@ export default function VehicleDetailPage() {
             <Edit className="w-3.5 h-3.5" />
             Edit Info
           </Button>
+
+          {currentUser?.role === 'ADMIN' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDeleteVehicleModalOpen(true)}
+              className="text-xs text-rose-600 border-rose-200 hover:bg-rose-50 gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              Delete Vehicle
+            </Button>
+          )}
 
           <Button
             variant="primary"
@@ -381,7 +405,7 @@ export default function VehicleDetailPage() {
                               className="h-7 px-2 text-[11px] text-emerald-700 hover:bg-emerald-50 border-emerald-200"
                               title="Remind client via WhatsApp"
                             >
-                              <MessageSquare className="w-3 h-3 text-emerald-600" />
+                              <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600" />
                             </Button>
                           )}
 
@@ -403,6 +427,18 @@ export default function VehicleDetailPage() {
                           >
                             Edit
                           </Button>
+
+                          {currentUser?.role === 'ADMIN' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setDocToDelete(doc)}
+                              className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                              title="Delete Document"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -492,6 +528,18 @@ export default function VehicleDetailPage() {
                       >
                         Edit
                       </Button>
+
+                      {currentUser?.role === 'ADMIN' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setTaskToDelete(task)}
+                          className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          title="Delete Task"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );
@@ -654,6 +702,65 @@ export default function VehicleDetailPage() {
           dueDate={whatsAppData.dueDate}
         />
       )}
+
+      {/* Delete Vehicle Confirmation */}
+      <ConfirmModal
+        isOpen={isDeleteVehicleModalOpen}
+        onClose={() => setIsDeleteVehicleModalOpen(false)}
+        onConfirm={async () => {
+          setIsDeleting(true);
+          try {
+            await deleteVehicle(vehicle.id);
+            router.push('/vehicles');
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        title="Delete Vehicle Record"
+        message={`Are you sure you want to permanently delete vehicle "${vehicle.registrationNumber}" (${vehicle.make} ${vehicle.model})? All documents, renewals, and linked tasks will be affected.`}
+        confirmText="Permanently Delete"
+        isLoading={isDeleting}
+      />
+
+      {/* Delete Document Confirmation */}
+      <ConfirmModal
+        isOpen={Boolean(docToDelete)}
+        onClose={() => setDocToDelete(null)}
+        onConfirm={async () => {
+          if (!docToDelete) return;
+          setIsDeleting(true);
+          try {
+            await deleteDocument(docToDelete.id);
+            setDocToDelete(null);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        title="Delete Compliance Document"
+        message={`Are you sure you want to delete document "${docToDelete?.documentType}" (#${docToDelete?.documentNumber || 'N/A'})?`}
+        confirmText="Delete Document"
+        isLoading={isDeleting}
+      />
+
+      {/* Delete Task Confirmation */}
+      <ConfirmModal
+        isOpen={Boolean(taskToDelete)}
+        onClose={() => setTaskToDelete(null)}
+        onConfirm={async () => {
+          if (!taskToDelete) return;
+          setIsDeleting(true);
+          try {
+            await deleteTask(taskToDelete.id);
+            setTaskToDelete(null);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        title="Delete Operational Task"
+        message={`Are you sure you want to delete task "${taskToDelete?.title}"?`}
+        confirmText="Delete Task"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }
