@@ -21,6 +21,9 @@ import {
   ShieldAlert,
   Edit,
   Trash2,
+  Lock,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -31,6 +34,8 @@ export default function AgentsPage() {
   const [newAgentName, setNewAgentName] = useState('');
   const [newAgentEmail, setNewAgentEmail] = useState('');
   const [newAgentMobile, setNewAgentMobile] = useState('');
+  const [newAgentPassword, setNewAgentPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [newAgentRole, setNewAgentRole] = useState<UserRole>('AGENT');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -227,23 +232,34 @@ export default function AgentsPage() {
         <form
           onSubmit={async (e) => {
             e.preventDefault();
-            if (!newAgentName.trim() || !newAgentEmail.trim() || !newAgentMobile.trim()) {
-              alert('Please complete all required fields.');
+            if (!newAgentName.trim() || !newAgentEmail.trim() || !newAgentMobile.trim() || !newAgentPassword.trim()) {
+              alert('Please complete all required fields including login password.');
+              return;
+            }
+            if (newAgentPassword.trim().length < 6) {
+              alert('Login password must be at least 6 characters long.');
               return;
             }
             setIsSaving(true);
             try {
-              await addAgent({
-                name: newAgentName.trim(),
-                email: newAgentEmail.trim(),
-                mobile: newAgentMobile.trim(),
-                role: newAgentRole,
-                status: 'ACTIVE',
-              });
+              await addAgent(
+                {
+                  name: newAgentName.trim(),
+                  email: newAgentEmail.trim(),
+                  mobile: newAgentMobile.trim(),
+                  role: newAgentRole,
+                  status: 'ACTIVE',
+                },
+                newAgentPassword.trim()
+              );
               setNewAgentName('');
               setNewAgentEmail('');
               setNewAgentMobile('');
+              setNewAgentPassword('');
               setIsAddUserModalOpen(false);
+              alert('Staff account successfully created! They can now log in using their email and password.');
+            } catch (err: any) {
+              alert(err?.message || 'Failed to create staff account. Please try again.');
             } finally {
               setIsSaving(false);
             }
@@ -259,13 +275,41 @@ export default function AgentsPage() {
           />
 
           <Input
-            label="Office Email Address"
+            label="Office Email Address (Username)"
             type="email"
             required
             value={newAgentEmail}
             onChange={(e) => setNewAgentEmail(e.target.value)}
             placeholder="e.g. anand@apexmotors.com"
           />
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Staff Login Password <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                minLength={6}
+                value={newAgentPassword}
+                onChange={(e) => setNewAgentPassword(e.target.value)}
+                placeholder="Set staff login password (min 6 characters)"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              This password will be used by the staff member to log into the portal.
+            </p>
+          </div>
 
           <Input
             label="Contact Mobile"

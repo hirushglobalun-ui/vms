@@ -13,7 +13,7 @@ import {
   VehicleDocument,
 } from '../types';
 import { isFirebaseConfigured } from '../firebase/config';
-import { signInStaff, signOutStaff, subscribeAuthState } from '../firebase/auth';
+import { signInStaff, signOutStaff, subscribeAuthState, createStaffAccount } from '../firebase/auth';
 import {
   subscribeClients,
   addClientDoc,
@@ -116,7 +116,10 @@ interface AppContextType {
   deleteTask: (id: string) => Promise<void>;
 
   // Staff / Agent operations
-  addAgent: (agent: Omit<User, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  addAgent: (
+    agent: Omit<User, 'id' | 'createdAt' | 'updatedAt'>,
+    password?: string
+  ) => Promise<string>;
   updateAgent: (id: string, updates: Partial<User>) => Promise<void>;
   deleteAgent: (id: string) => Promise<void>;
 
@@ -662,8 +665,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const addAgent = async (agentData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  const addAgent = async (
+    agentData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>,
+    password?: string
+  ): Promise<string> => {
     if (isFirebaseConfigured) {
+      if (password && password.trim().length >= 6) {
+        try {
+          const created = await createStaffAccount(
+            agentData.email,
+            password.trim(),
+            agentData.name,
+            agentData.mobile,
+            agentData.role
+          );
+          return created.id;
+        } catch (err) {
+          console.warn('Firebase Auth user creation fallback to Firestore doc:', err);
+          return await addUserDoc(agentData);
+        }
+      }
       return await addUserDoc(agentData);
     } else {
       const id = `user_${Date.now()}`;

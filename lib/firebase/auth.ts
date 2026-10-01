@@ -1,12 +1,14 @@
+import { getApps, initializeApp } from 'firebase/app';
 import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   createUserWithEmailAndPassword,
+  getAuth,
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, isFirebaseConfigured } from './config';
+import { auth, db, isFirebaseConfigured, firebaseConfig } from './config';
 import { User, UserRole } from '../types';
 
 /**
@@ -63,12 +65,23 @@ export async function createStaffAccount(
   mobile: string,
   role: UserRole
 ): Promise<User> {
-  if (!isFirebaseConfigured || !auth || !db) {
+  if (!isFirebaseConfigured || !db) {
     throw new Error('Firebase configuration is missing.');
   }
 
-  const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-  const uid = userCredential.user.uid;
+  let uid = '';
+  try {
+    const secondaryApp =
+      getApps().find((a) => a.name === 'StaffCreatorAuth') ||
+      initializeApp(firebaseConfig, 'StaffCreatorAuth');
+    const secondaryAuth = getAuth(secondaryApp);
+    const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email.trim(), password);
+    uid = userCredential.user.uid;
+    await signOut(secondaryAuth);
+  } catch (authErr: any) {
+    console.error('Firebase Auth user creation error:', authErr);
+    throw authErr;
+  }
 
   const newUser: User = {
     id: uid,
