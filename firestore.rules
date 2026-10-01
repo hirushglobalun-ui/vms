@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && getUserData().role == 'ADMIN' && getUserData().status == 'ACTIVE';
+    }
+    
+    function isAgent() {
+      return isAuthenticated() && getUserData().role == 'AGENT' && getUserData().status == 'ACTIVE';
+    }
+    
+    function getUserId() {
+      return request.auth.uid;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || (isAuthenticated() && userId == getUserId());
+    }
+
+    // Clients collection
+    match /clients/{clientId} {
+      allow read: if isAdmin() || (isAgent() && resource.data.assignedAgentId == getUserId());
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || (isAgent() && resource.data.assignedAgentId == getUserId());
+      allow delete: if isAdmin();
+    }
+
+    // Vehicles collection
+    match /vehicles/{vehicleId} {
+      allow read: if isAdmin() || (isAgent() && resource.data.assignedAgentId == getUserId());
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || (isAgent() && resource.data.assignedAgentId == getUserId());
+      allow delete: if isAdmin();
+    }
+
+    // Vehicle Documents collection
+    match /vehicleDocuments/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Tasks collection
+    match /tasks/{taskId} {
+      allow read: if isAdmin() || (isAgent() && resource.data.assignedTo == getUserId());
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || (isAgent() && resource.data.assignedTo == getUserId());
+      allow delete: if isAdmin();
+    }
+
+    // Notifications collection
+    match /notifications/{notifId} {
+      allow read, update: if isAuthenticated() && resource.data.userId == getUserId();
+      allow create: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Activity Logs collection
+    match /activityLogs/{logId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == getUserId());
+      allow create: if isAuthenticated();
+      allow delete: if false; // Audit logs are immutable
+    }
+
+    // Settings collection
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}
