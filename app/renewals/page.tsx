@@ -122,7 +122,7 @@ export default function RenewalsPage() {
       });
     }
 
-    // Sort by priority/urgency (Section 65)
+    // Sort by priority/urgency
     return sortDocumentsByUrgency(result);
   }, [filteredDocuments, activeTab, selectedDocType, selectedAgent, searchTerm, vehicles, clients]);
 
@@ -144,8 +144,8 @@ export default function RenewalsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <RotateCcw className="w-5 h-5 text-blue-600" />
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+            <RotateCcw className="w-6 h-6 text-blue-600" />
             Renewal Operations Center
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -154,34 +154,33 @@ export default function RenewalsPage() {
         </div>
       </div>
 
-      {/* Tabs (Section 31) */}
-      <div className="flex items-center gap-1.5 border-b border-slate-200 overflow-x-auto pb-1">
+      {/* Tabs */}
+      <div className="flex items-center gap-1.5 border-b border-slate-200 overflow-x-auto pb-1 text-xs">
         <button
           onClick={() => setActiveTab('ALL')}
-          className={`px-4 py-2 rounded-t-xl text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+          className={`px-3 sm:px-4 py-2 rounded-t-xl font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'ALL'
-              ? 'border-blue-600 text-blue-600 bg-white'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
+              ? 'border-blue-600 text-blue-600 bg-blue-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          All Renewals
-          <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full">
-            {filteredDocuments.length}
+          All Active
+          <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full font-bold">
+            {filteredDocuments.filter((d) => d.status !== 'COMPLETED').length}
           </span>
         </button>
 
         <button
           onClick={() => setActiveTab('OVERDUE')}
-          className={`px-4 py-2 rounded-t-xl text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+          className={`px-3 sm:px-4 py-2 rounded-t-xl font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'OVERDUE'
               ? 'border-rose-600 text-rose-600 bg-rose-50/50'
               : 'border-transparent text-slate-500 hover:text-rose-600'
           }`}
         >
-          <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
           Overdue
           {overdueCount > 0 && (
-            <span className="text-[10px] bg-rose-600 text-white px-1.5 py-0.5 rounded-full font-bold">
+            <span className="text-[10px] bg-rose-500 text-white px-1.5 py-0.5 rounded-full font-bold">
               {overdueCount}
             </span>
           )}
@@ -189,16 +188,15 @@ export default function RenewalsPage() {
 
         <button
           onClick={() => setActiveTab('DUE_TODAY')}
-          className={`px-4 py-2 rounded-t-xl text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+          className={`px-3 sm:px-4 py-2 rounded-t-xl font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'DUE_TODAY'
-              ? 'border-red-600 text-red-600 bg-red-50/50'
-              : 'border-transparent text-slate-500 hover:text-red-600'
+              ? 'border-amber-600 text-amber-600 bg-amber-50/50'
+              : 'border-transparent text-slate-500 hover:text-amber-600'
           }`}
         >
-          <Clock className="w-3.5 h-3.5 text-red-600" />
           Due Today
           {dueTodayCount > 0 && (
-            <span className="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded-full font-bold">
+            <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-bold">
               {dueTodayCount}
             </span>
           )}
@@ -206,15 +204,15 @@ export default function RenewalsPage() {
 
         <button
           onClick={() => setActiveTab('DUE_SOON')}
-          className={`px-4 py-2 rounded-t-xl text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+          className={`px-3 sm:px-4 py-2 rounded-t-xl font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'DUE_SOON'
-              ? 'border-amber-600 text-amber-600 bg-amber-50/50'
-              : 'border-transparent text-slate-500 hover:text-amber-600'
+              ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
+              : 'border-transparent text-slate-500 hover:text-indigo-600'
           }`}
         >
           Due Soon
           {dueSoonCount > 0 && (
-            <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full font-bold">
+            <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded-full font-bold">
               {dueSoonCount}
             </span>
           )}
@@ -222,21 +220,21 @@ export default function RenewalsPage() {
 
         <button
           onClick={() => setActiveTab('COMPLETED')}
-          className={`px-4 py-2 rounded-t-xl text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+          className={`px-3 sm:px-4 py-2 rounded-t-xl font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
             activeTab === 'COMPLETED'
               ? 'border-emerald-600 text-emerald-600 bg-emerald-50/50'
               : 'border-transparent text-slate-500 hover:text-emerald-600'
           }`}
         >
-          Completed / Archived
-          <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full">
+          Completed
+          <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-bold">
             {completedCount}
           </span>
         </button>
       </div>
 
       {/* Filter and Search */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row gap-3 items-center justify-between">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row gap-3 items-center justify-between">
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -244,15 +242,15 @@ export default function RenewalsPage() {
             placeholder="Search vehicle reg, client name, doc no..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-600 bg-slate-50/50"
+            className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-600 bg-slate-50/50"
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
           <select
             value={selectedDocType}
             onChange={(e) => setSelectedDocType(e.target.value)}
-            className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700"
+            className="text-xs border border-slate-200 rounded-xl px-2.5 py-1.5 bg-white text-slate-700"
           >
             <option value="ALL">All Categories</option>
             <option value="INSURANCE">Insurance</option>
@@ -268,7 +266,7 @@ export default function RenewalsPage() {
             <select
               value={selectedAgent}
               onChange={(e) => setSelectedAgent(e.target.value)}
-              className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700"
+              className="text-xs border border-slate-200 rounded-xl px-2.5 py-1.5 bg-white text-slate-700"
             >
               <option value="ALL">All Agents</option>
               {activeAgents.map((a) => (
@@ -281,186 +279,278 @@ export default function RenewalsPage() {
         </div>
       </div>
 
-      {/* Renewals Table (Section 31) */}
-      <Card>
+      {/* Renewals Table & Mobile Touch Cards */}
+      <Card className="rounded-2xl border-slate-200 shadow-2xs overflow-hidden">
         <CardContent className="p-0">
           {filteredAndSortedDocs.length === 0 ? (
-            <div className="py-12 text-center text-xs text-slate-500">
-              No renewal records found matching the selected view.
+            <div className="py-14 text-center text-xs text-slate-500">
+              <RotateCcw className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+              <div className="text-sm font-bold text-slate-800">No Renewals Found</div>
+              <p className="mt-1 text-slate-400">No renewal records matched this status or search filter.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50/70 border-b border-slate-100 text-slate-500 font-semibold uppercase tracking-wider">
-                  <tr>
-                    <th className="px-4 py-3 w-16 text-center font-mono">Sl. No.</th>
-                    <th className="px-5 py-3">Vehicle</th>
-                    <th className="px-4 py-3">Client</th>
-                    <th className="px-4 py-3">Document</th>
-                    <th className="px-4 py-3">Due / Expiry Date</th>
-                    <th className="px-4 py-3">Assigned Agent</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-5 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {paginatedDocs.map((doc, index) => {
-                    const serialNo = (currentPage - 1) * pageSize + index + 1;
-                    const veh = vehicles.find((v) => v.id === doc.vehicleId);
-                    const client = clients.find((c) => c.id === doc.clientId);
-                    const agent = users.find((u) => u.id === veh?.assignedAgentId);
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/70 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                    <tr>
+                      <th className="px-4 py-3 w-14 text-center font-mono">Sl. No.</th>
+                      <th className="px-5 py-3">Vehicle</th>
+                      <th className="px-4 py-3">Client</th>
+                      <th className="px-4 py-3">Document</th>
+                      <th className="px-4 py-3">Due / Expiry Date</th>
+                      <th className="px-4 py-3">Assigned Agent</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-5 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {paginatedDocs.map((doc, index) => {
+                      const serialNo = (currentPage - 1) * pageSize + index + 1;
+                      const veh = vehicles.find((v) => v.id === doc.vehicleId);
+                      const client = clients.find((c) => c.id === doc.clientId);
+                      const agent = users.find((u) => u.id === veh?.assignedAgentId);
 
-                    return (
-                      <tr key={doc.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-4 py-3.5 text-center font-mono text-xs text-slate-400 font-semibold">
-                          {serialNo}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          {veh ? (
-                            <Link
-                              href={`/vehicles/${veh.id}`}
-                              className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 inline-block hover:bg-blue-100 transition-colors"
-                            >
-                              {veh.registrationNumber}
-                            </Link>
-                          ) : (
-                            'N/A'
-                          )}
-                          <div className="text-[11px] text-slate-500 mt-0.5">
-                            {veh?.make} {veh?.model}
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-3.5">
-                          {client ? (
-                            <Link
-                              href={`/clients/${client.id}`}
-                              className="font-bold text-slate-900 hover:text-blue-600 block"
-                            >
-                              {client.name}
-                            </Link>
-                          ) : (
-                            'N/A'
-                          )}
-                          <div className="text-[11px] text-slate-500 font-mono">
-                            {client?.mobile}
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-3.5">
-                          <div className="font-semibold text-slate-900">
-                            {getDocumentTypeName(doc.documentType)}
-                          </div>
-                          {doc.documentNumber && (
-                            <div className="text-[11px] text-slate-400 font-mono">
-                              #{doc.documentNumber}
-                            </div>
-                          )}
-                          {doc.amount && (
-                            <div className="text-[11px] text-slate-500">
-                              {formatCurrency(doc.amount)}
-                            </div>
-                          )}
-                        </td>
-
-                        <td className="px-4 py-3.5 font-mono font-bold text-slate-800">
-                          {doc.expiryDate || 'Permanent / N/A'}
-                        </td>
-
-                        <td className="px-4 py-3.5">
-                          <span className="font-medium text-slate-700">
-                            {agent?.name || 'Unassigned'}
-                          </span>
-                        </td>
-
-                        <td className="px-4 py-3.5">
-                          <RenewalStatusBadge status={doc.status} />
-                        </td>
-
-                        <td className="px-5 py-3.5 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* WhatsApp Action Icon Button */}
-                            {client && veh && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  setWhatsAppData({
-                                    isOpen: true,
-                                    clientName: client.name,
-                                    clientMobile: client.mobile,
-                                    registrationNumber: veh.registrationNumber,
-                                    documentType: doc.documentType,
-                                    dueDate: doc.expiryDate,
-                                  })
-                                }
-                                className="h-8 w-8 p-0 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
-                                title="Contact via WhatsApp"
-                                aria-label="Contact via WhatsApp"
+                      return (
+                        <tr key={doc.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-4 py-3.5 text-center font-mono text-xs text-slate-400 font-semibold">
+                            {serialNo}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            {veh ? (
+                              <Link
+                                href={`/vehicles/${veh.id}`}
+                                className="font-mono font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 inline-block hover:bg-blue-100 transition-colors"
                               >
-                                <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
-                              </Button>
+                                {veh.registrationNumber}
+                              </Link>
+                            ) : (
+                              'N/A'
                             )}
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              {veh?.make} {veh?.model}
+                            </div>
+                          </td>
 
-                            {/* Complete Renewal Action Icon Button */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setCompletionDoc(doc)}
-                              className="h-8 w-8 p-0 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
-                              title="Complete Renewal Cycle"
-                              aria-label="Complete Renewal Cycle"
-                            >
-                              <CheckCircle2 className="w-4 h-4" />
-                            </Button>
+                          <td className="px-4 py-3.5">
+                            {client ? (
+                              <Link
+                                href={`/clients/${client.id}`}
+                                className="font-bold text-slate-900 hover:text-blue-600 block"
+                              >
+                                {client.name}
+                              </Link>
+                            ) : (
+                              'N/A'
+                            )}
+                            <div className="text-[11px] text-slate-500 font-mono">
+                              {client?.mobile}
+                            </div>
+                          </td>
 
-                            {/* Edit Document Action Icon Button */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setEditingDoc(doc)}
-                              className="h-8 w-8 p-0 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 border-slate-200"
-                              title="Edit Document"
-                              aria-label="Edit Document"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
+                          <td className="px-4 py-3.5">
+                            <div className="font-semibold text-slate-900">
+                              {getDocumentTypeName(doc.documentType)}
+                            </div>
+                            {doc.documentNumber && (
+                              <div className="text-[11px] text-slate-400 font-mono">
+                                #{doc.documentNumber}
+                              </div>
+                            )}
+                            {doc.amount && (
+                              <div className="text-[11px] text-slate-500">
+                                {formatCurrency(doc.amount)}
+                              </div>
+                            )}
+                          </td>
 
-                            {/* View Vehicle Action Icon Button */}
-                            {veh && (
-                              <Link href={`/vehicles/${veh.id}`} title="View Vehicle">
+                          <td className="px-4 py-3.5 font-mono font-bold text-slate-800">
+                            {doc.expiryDate || 'Permanent / N/A'}
+                          </td>
+
+                          <td className="px-4 py-3.5">
+                            <span className="font-medium text-slate-700">
+                              {agent?.name || 'Unassigned'}
+                            </span>
+                          </td>
+
+                          <td className="px-4 py-3.5">
+                            <RenewalStatusBadge status={doc.status} />
+                          </td>
+
+                          <td className="px-5 py-3.5 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* WhatsApp Action Icon Button */}
+                              {client && veh && (
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-8 w-8 p-0 rounded-lg text-slate-700 hover:text-blue-700 hover:bg-blue-50 border-slate-200"
-                                  aria-label="View Vehicle"
+                                  onClick={() =>
+                                    setWhatsAppData({
+                                      isOpen: true,
+                                      clientName: client.name,
+                                      clientMobile: client.mobile,
+                                      registrationNumber: veh.registrationNumber,
+                                      documentType: doc.documentType,
+                                      dueDate: doc.expiryDate,
+                                    })
+                                  }
+                                  className="h-8 w-8 p-0 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                                  title="Contact via WhatsApp"
+                                  aria-label="Contact via WhatsApp"
                                 >
-                                  <Eye className="w-4 h-4" />
+                                  <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
                                 </Button>
-                              </Link>
-                            )}
+                              )}
 
-                            {/* Delete Document Action Icon Button */}
-                            {currentUser?.role === 'ADMIN' && (
+                              {/* Complete Renewal Action Icon Button */}
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => setDocToDelete(doc)}
-                                className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-slate-200 hover:border-rose-200"
-                                title="Delete Document"
-                                aria-label="Delete Document"
+                                onClick={() => setCompletionDoc(doc)}
+                                className="h-8 w-8 p-0 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                                title="Complete Renewal Cycle"
+                                aria-label="Complete Renewal Cycle"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <CheckCircle2 className="w-4 h-4" />
                               </Button>
-                            )}
+
+                              {/* Edit Document Action Icon Button */}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditingDoc(doc)}
+                                className="h-8 w-8 p-0 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 border-slate-200"
+                                title="Edit Document"
+                                aria-label="Edit Document"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+
+                              {/* View Vehicle Action Icon Button */}
+                              {veh && (
+                                <Link href={`/vehicles/${veh.id}`} title="View Vehicle">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 w-8 p-0 rounded-lg text-slate-700 hover:text-blue-700 hover:bg-blue-50 border-slate-200"
+                                    aria-label="View Vehicle"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </Button>
+                                </Link>
+                              )}
+
+                              {/* Delete Document Action Icon Button */}
+                              {currentUser?.role === 'ADMIN' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setDocToDelete(doc)}
+                                  className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-slate-200 hover:border-rose-200"
+                                  title="Delete Document"
+                                  aria-label="Delete Document"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Touch Cards View */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {paginatedDocs.map((doc, index) => {
+                  const veh = vehicles.find((v) => v.id === doc.vehicleId);
+                  const client = clients.find((c) => c.id === doc.clientId);
+
+                  return (
+                    <div key={doc.id} className="p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          {veh && (
+                            <Link
+                              href={`/vehicles/${veh.id}`}
+                              className="font-mono font-bold text-sm text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 inline-block hover:bg-blue-100"
+                            >
+                              {veh.registrationNumber}
+                            </Link>
+                          )}
+                          <div className="text-xs font-bold text-slate-900 mt-1">
+                            {getDocumentTypeName(doc.documentType)}
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          <div className="text-[11px] text-slate-500">
+                            Owner: {client?.name || 'Unknown'}
+                          </div>
+                        </div>
+
+                        <RenewalStatusBadge status={doc.status} />
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Due Date</span>
+                          <span className="font-mono font-bold text-slate-900">{doc.expiryDate || 'N/A'}</span>
+                        </div>
+                        {doc.amount && (
+                          <div className="text-right">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block">Amount</span>
+                            <span className="font-bold text-slate-800">{formatCurrency(doc.amount)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        {client && veh && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setWhatsAppData({
+                                isOpen: true,
+                                clientName: client.name,
+                                clientMobile: client.mobile,
+                                registrationNumber: veh.registrationNumber,
+                                documentType: doc.documentType,
+                                dueDate: doc.expiryDate,
+                              })
+                            }
+                            className="flex-1 text-xs gap-1 text-emerald-700 border-emerald-200 hover:bg-emerald-50 h-9"
+                          >
+                            <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
+                            <span>WhatsApp</span>
+                          </Button>
+                        )}
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setCompletionDoc(doc)}
+                          className="flex-1 text-xs gap-1 text-blue-700 border-blue-200 hover:bg-blue-50 h-9"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Renew</span>
+                        </Button>
+
+                        {veh && (
+                          <Link href={`/vehicles/${veh.id}`}>
+                            <Button size="sm" variant="outline" className="h-9 px-3 text-slate-600">
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
 
           <TablePagination
@@ -473,7 +563,7 @@ export default function RenewalsPage() {
         </CardContent>
       </Card>
 
-      {/* Modals */}
+      {/* Completion Modal */}
       {completionDoc && (
         <CompletionModal
           isOpen={Boolean(completionDoc)}
@@ -485,16 +575,7 @@ export default function RenewalsPage() {
         />
       )}
 
-      <WhatsAppModal
-        isOpen={whatsAppData.isOpen}
-        onClose={() => setWhatsAppData((prev) => ({ ...prev, isOpen: false }))}
-        clientName={whatsAppData.clientName}
-        clientMobile={whatsAppData.clientMobile}
-        registrationNumber={whatsAppData.registrationNumber}
-        documentType={whatsAppData.documentType}
-        dueDate={whatsAppData.dueDate}
-      />
-      {/* Edit Document Modal */}
+      {/* Document Edit Modal */}
       {editingDoc && (
         <DocumentModal
           isOpen={Boolean(editingDoc)}
@@ -505,25 +586,44 @@ export default function RenewalsPage() {
         />
       )}
 
-      {/* Delete Confirmation Modal */}
-      <ConfirmModal
-        isOpen={Boolean(docToDelete)}
-        onClose={() => setDocToDelete(null)}
-        onConfirm={async () => {
-          if (!docToDelete) return;
-          setIsDeleting(true);
-          try {
-            await deleteDocument(docToDelete.id);
-            setDocToDelete(null);
-          } finally {
-            setIsDeleting(false);
-          }
-        }}
-        title="Delete Compliance Document"
-        message={`Are you sure you want to permanently delete document "${docToDelete?.documentType}" (#${docToDelete?.documentNumber || 'N/A'})?`}
-        confirmText="Delete Document"
-        isLoading={isDeleting}
+      {/* WhatsApp Modal */}
+      <WhatsAppModal
+        isOpen={whatsAppData.isOpen}
+        onClose={() => setWhatsAppData((prev) => ({ ...prev, isOpen: false }))}
+        clientName={whatsAppData.clientName}
+        clientMobile={whatsAppData.clientMobile}
+        registrationNumber={whatsAppData.registrationNumber}
+        documentType={whatsAppData.documentType}
+        dueDate={whatsAppData.dueDate}
       />
+
+      {/* Delete Modal */}
+      {docToDelete && (
+        <ConfirmModal
+          isOpen={Boolean(docToDelete)}
+          onClose={() => setDocToDelete(null)}
+          title="Delete Document Record?"
+          message={`Are you sure you want to delete ${getDocumentTypeName(
+            docToDelete.documentType
+          )} for vehicle ${
+            vehicles.find((v) => v.id === docToDelete.vehicleId)?.registrationNumber || ''
+          }? This action cannot be undone.`}
+          confirmText="Yes, Delete Document"
+          isDestructive={true}
+          isLoading={isDeleting}
+          onConfirm={async () => {
+            setIsDeleting(true);
+            try {
+              await deleteDocument(docToDelete.id);
+              setDocToDelete(null);
+            } catch (err: any) {
+              alert(err?.message || 'Failed to delete document.');
+            } finally {
+              setIsDeleting(false);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

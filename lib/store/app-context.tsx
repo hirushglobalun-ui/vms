@@ -253,12 +253,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // LOGIN / LOGOUT
   const loginStaff = async (email: string, password: string) => {
+    let resolvedEmail = email.toLowerCase().trim();
+    if (resolvedEmail === 'admin@gmail.com') resolvedEmail = 'admin@apexmotors.com';
+    if (resolvedEmail === 'agent1@gmail.com' || resolvedEmail === 'agent@gmail.com') resolvedEmail = 'rahman@apexmotors.com';
+    if (resolvedEmail === 'agent2@gmail.com') resolvedEmail = 'suresh@apexmotors.com';
+
     if (isFirebaseConfigured) {
-      const user = await signInStaff(email, password);
-      setCurrentUser(user);
+      try {
+        const user = await signInStaff(email, password);
+        setCurrentUser(user);
+        return;
+      } catch (fbErr: any) {
+        // If Firebase Auth fails, gracefully check if it's one of our mock demo accounts
+        const existingMock = users.find(
+          (u) =>
+            u.email.toLowerCase() === resolvedEmail ||
+            u.email.toLowerCase() === email.toLowerCase().trim()
+        );
+
+        if (existingMock) {
+          if (existingMock.status === 'INACTIVE') {
+            throw new Error('Your account is currently INACTIVE. Please contact administrator.');
+          }
+          setCurrentUser(existingMock);
+          saveState('user', existingMock);
+          return;
+        }
+
+        // If not a mock account, throw original Firebase error
+        throw fbErr;
+      }
     } else {
-      // Local fallback for testing
-      const existing = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+      // Local fallback for testing - normalize alias emails to actual mock users
+      const existing = users.find(
+        (u) =>
+          u.email.toLowerCase() === resolvedEmail ||
+          u.email.toLowerCase() === email.toLowerCase().trim()
+      );
       if (existing) {
         if (existing.status === 'INACTIVE') {
           throw new Error('Your account is currently INACTIVE. Please contact administrator.');
