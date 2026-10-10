@@ -22,6 +22,8 @@ export interface Client {
   mobile: string;
   alternateMobile?: string;
   address: string;
+  relationshipName?: string; // S/D/W of
+  pincode?: string;
   email?: string;
   assignedAgentId: string;
   status: ClientStatus;
@@ -57,6 +59,7 @@ export interface Vehicle {
   variant?: string;
   fuelType: FuelType;
   manufacturingYear?: number;
+  manufacturingMonthYear?: string; // e.g. "January 2015" or "1-2015"
   registrationDate?: string;
   chassisNumber?: string;
   engineNumber?: string;
@@ -65,6 +68,18 @@ export interface Vehicle {
   assignedAgentId: string;
   status: VehicleStatus;
   notes?: string;
+  // Detailed RC Smart Card Technical Specs
+  color?: string;
+  bodyType?: string;
+  seatingCapacity?: number;
+  unladenWeight?: number; // kg
+  cubicCapacity?: number; // cc
+  horsepower?: string; // BHP/Kw
+  wheelbase?: number; // mm
+  cylinders?: number;
+  ownerSerial?: number;
+  financier?: string;
+  emissionNorms?: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;

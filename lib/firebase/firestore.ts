@@ -30,6 +30,20 @@ import {
 import { calculateRenewalStatus } from '../renewals/engine';
 import { normalizeRegistrationNumber } from '../utils';
 
+/**
+ * Removes undefined fields from objects before saving to Firestore,
+ * preventing FirebaseError: Function addDoc() called with invalid data. Unsupported field value: undefined
+ */
+export function cleanFirestoreData<T extends Record<string, any>>(data: T): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 // ========================
 // CLIENTS
 // ========================
@@ -67,13 +81,14 @@ export async function addClientDoc(
 ): Promise<string> {
   if (!isFirebaseConfigured || !db) throw new Error('Firestore not configured.');
 
-  const docRef = await addDoc(collection(db, 'clients'), {
+  const payload = cleanFirestoreData({
     ...clientData,
     createdBy: createdByUserId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
 
+  const docRef = await addDoc(collection(db, 'clients'), payload);
   return docRef.id;
 }
 
@@ -83,10 +98,11 @@ export async function updateClientDoc(
 ): Promise<void> {
   if (!isFirebaseConfigured || !db) throw new Error('Firestore not configured.');
   const ref = doc(db, 'clients', clientId);
-  await updateDoc(ref, {
+  const payload = cleanFirestoreData({
     ...updates,
     updatedAt: new Date().toISOString(),
   });
+  await updateDoc(ref, payload);
 }
 
 export async function deleteClientDoc(clientId: string): Promise<void> {
@@ -144,7 +160,7 @@ export async function addVehicleDoc(
     throw new Error(`Vehicle with registration number ${vehData.registrationNumber} is already registered!`);
   }
 
-  const docRef = await addDoc(collection(db, 'vehicles'), {
+  const payload = cleanFirestoreData({
     ...vehData,
     normalizedRegistrationNumber: norm,
     createdBy: createdByUserId,
@@ -152,6 +168,7 @@ export async function addVehicleDoc(
     updatedAt: new Date().toISOString(),
   });
 
+  const docRef = await addDoc(collection(db, 'vehicles'), payload);
   return docRef.id;
 }
 
@@ -167,7 +184,7 @@ export async function updateVehicleDoc(
     payload.normalizedRegistrationNumber = normalizeRegistrationNumber(updates.registrationNumber);
   }
 
-  await updateDoc(ref, payload);
+  await updateDoc(ref, cleanFirestoreData(payload));
 }
 
 export async function deleteVehicleDoc(vehicleId: string): Promise<void> {
@@ -209,7 +226,7 @@ export async function addVehicleDocumentDoc(
 
   const status = calculateRenewalStatus(docData.expiryDate, docData.reminderDays);
 
-  const docRef = await addDoc(collection(db, 'vehicleDocuments'), {
+  const payload = cleanFirestoreData({
     ...docData,
     status,
     isHistorical: false,
@@ -218,6 +235,7 @@ export async function addVehicleDocumentDoc(
     updatedAt: new Date().toISOString(),
   });
 
+  const docRef = await addDoc(collection(db, 'vehicleDocuments'), payload);
   return docRef.id;
 }
 
@@ -237,7 +255,7 @@ export async function updateVehicleDocumentDoc(
     payload.status = calculateRenewalStatus(updates.expiryDate, updates.reminderDays, updates.isHistorical);
   }
 
-  await updateDoc(ref, payload);
+  await updateDoc(ref, cleanFirestoreData(payload));
 }
 
 export async function deleteDocumentDoc(docId: string): Promise<void> {

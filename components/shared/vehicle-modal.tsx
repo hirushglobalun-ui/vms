@@ -52,7 +52,9 @@ export function VehicleModal({
   const [selectedExistingClientId, setSelectedExistingClientId] = useState(defaultClientId || '');
   const [clientMobile, setClientMobile] = useState('');
   const [clientName, setClientName] = useState('');
+  const [relationshipName, setRelationshipName] = useState('');
   const [clientAddress, setClientAddress] = useState('');
+  const [pincode, setPincode] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [matchedExistingClient, setMatchedExistingClient] = useState<any>(null);
 
@@ -65,6 +67,7 @@ export function VehicleModal({
   const [variant, setVariant] = useState('');
   const [fuelType, setFuelType] = useState<FuelType>('PETROL');
   const [manufacturingYear, setManufacturingYear] = useState<number | ''>('');
+  const [manufacturingMonthYear, setManufacturingMonthYear] = useState('');
   const [registrationDate, setRegistrationDate] = useState('');
   const [chassisNumber, setChassisNumber] = useState('');
   const [engineNumber, setEngineNumber] = useState('');
@@ -72,6 +75,20 @@ export function VehicleModal({
   const [registrationValidity, setRegistrationValidity] = useState('');
   const [assignedAgentId, setAssignedAgentId] = useState('');
   const [notes, setNotes] = useState('');
+
+  // RC Smart Card Detailed Specifications (Kerala & Indian Standard)
+  const [color, setColor] = useState('');
+  const [bodyType, setBodyType] = useState('');
+  const [seatingCapacity, setSeatingCapacity] = useState<number | ''>('');
+  const [unladenWeight, setUnladenWeight] = useState<number | ''>('');
+  const [cubicCapacity, setCubicCapacity] = useState<number | ''>('');
+  const [horsepower, setHorsepower] = useState('');
+  const [wheelbase, setWheelbase] = useState<number | ''>('');
+  const [cylinders, setCylinders] = useState<number | ''>('');
+  const [ownerSerial, setOwnerSerial] = useState<number | ''>('');
+  const [financier, setFinancier] = useState('');
+  const [emissionNorms, setEmissionNorms] = useState('');
+
   const [errorMsg, setErrorMsg] = useState('');
   const [successNotice, setSuccessNotice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -101,7 +118,9 @@ export function VehicleModal({
         setSelectedExistingClientId(existingClient.id);
         setClientMobile(existingClient.mobile);
         setClientName(existingClient.name);
+        setRelationshipName(existingClient.relationshipName || '');
         setClientAddress(existingClient.address);
+        setPincode(existingClient.pincode || '');
         setClientEmail(existingClient.email || '');
       }
 
@@ -113,6 +132,7 @@ export function VehicleModal({
       setVariant(initialVehicle.variant || '');
       setFuelType(initialVehicle.fuelType);
       setManufacturingYear(initialVehicle.manufacturingYear ?? '');
+      setManufacturingMonthYear(initialVehicle.manufacturingMonthYear || '');
       setRegistrationDate(initialVehicle.registrationDate || '');
       setChassisNumber(initialVehicle.chassisNumber || '');
       setEngineNumber(initialVehicle.engineNumber || '');
@@ -120,6 +140,18 @@ export function VehicleModal({
       setRegistrationValidity(initialVehicle.registrationValidity || '');
       setAssignedAgentId(initialVehicle.assignedAgentId);
       setNotes(initialVehicle.notes || '');
+
+      setColor(initialVehicle.color || '');
+      setBodyType(initialVehicle.bodyType || '');
+      setSeatingCapacity(initialVehicle.seatingCapacity ?? '');
+      setUnladenWeight(initialVehicle.unladenWeight ?? '');
+      setCubicCapacity(initialVehicle.cubicCapacity ?? '');
+      setHorsepower(initialVehicle.horsepower || '');
+      setWheelbase(initialVehicle.wheelbase ?? '');
+      setCylinders(initialVehicle.cylinders ?? '');
+      setOwnerSerial(initialVehicle.ownerSerial ?? '');
+      setFinancier(initialVehicle.financier || '');
+      setEmissionNorms(initialVehicle.emissionNorms || '');
     } else {
       // Creating vehicle - clean slate with ZERO dummy defaults
       if (defaultClientId) {
@@ -129,7 +161,9 @@ export function VehicleModal({
           setSelectedExistingClientId(client.id);
           setClientMobile(client.mobile);
           setClientName(client.name);
+          setRelationshipName(client.relationshipName || '');
           setClientAddress(client.address);
+          setPincode(client.pincode || '');
           setClientEmail(client.email || '');
         }
       } else {
@@ -137,7 +171,9 @@ export function VehicleModal({
         setSelectedExistingClientId('');
         setClientMobile('');
         setClientName('');
+        setRelationshipName('');
         setClientAddress('');
+        setPincode('');
         setClientEmail('');
       }
 
@@ -149,6 +185,7 @@ export function VehicleModal({
       setVariant('');
       setFuelType('PETROL');
       setManufacturingYear('');
+      setManufacturingMonthYear('');
       setRegistrationDate('');
       setChassisNumber('');
       setEngineNumber('');
@@ -160,6 +197,18 @@ export function VehicleModal({
           : (activeAgents.find((u) => u.role === 'AGENT')?.id || currentUser?.id || '')
       );
       setNotes('');
+
+      setColor('');
+      setBodyType('');
+      setSeatingCapacity('');
+      setUnladenWeight('');
+      setCubicCapacity('');
+      setHorsepower('');
+      setWheelbase('');
+      setCylinders('');
+      setOwnerSerial('');
+      setFinancier('');
+      setEmissionNorms('');
     }
   }, [initialVehicle, defaultClientId, isOpen, clients, currentUser]);
 
@@ -176,7 +225,9 @@ export function VehicleModal({
       if (match) {
         setMatchedExistingClient(match);
         setClientName(match.name);
+        if (match.relationshipName) setRelationshipName(match.relationshipName);
         setClientAddress(match.address);
+        if (match.pincode) setPincode(match.pincode);
         if (match.email) setClientEmail(match.email);
       } else {
         setMatchedExistingClient(null);
@@ -229,15 +280,38 @@ export function VehicleModal({
     if (data.vehicleClass) setVehicleClass(data.vehicleClass);
     if (data.fuelType) setFuelType(data.fuelType);
     if (data.manufacturingYear) setManufacturingYear(data.manufacturingYear);
+    if (data.manufacturingMonthYear) setManufacturingMonthYear(data.manufacturingMonthYear);
     if (data.registrationDate) setRegistrationDate(data.registrationDate);
     if (data.chassisNumber) setChassisNumber(data.chassisNumber);
     if (data.engineNumber) setEngineNumber(data.engineNumber);
     if (data.rto) setRto(data.rto);
     if (data.registrationValidity) setRegistrationValidity(data.registrationValidity);
 
-    // If owner name was extracted from RC and client name is empty, fill it
+    // Detailed RC Specifications
+    if (data.color) setColor(data.color);
+    if (data.bodyType) setBodyType(data.bodyType);
+    if (data.seatingCapacity !== undefined && data.seatingCapacity !== null) setSeatingCapacity(data.seatingCapacity);
+    if (data.unladenWeight !== undefined && data.unladenWeight !== null) setUnladenWeight(data.unladenWeight);
+    if (data.cubicCapacity !== undefined && data.cubicCapacity !== null) setCubicCapacity(data.cubicCapacity);
+    if (data.horsepower) setHorsepower(data.horsepower);
+    if (data.wheelbase !== undefined && data.wheelbase !== null) setWheelbase(data.wheelbase);
+    if (data.cylinders !== undefined && data.cylinders !== null) setCylinders(data.cylinders);
+    if (data.ownerSerial !== undefined && data.ownerSerial !== null) setOwnerSerial(data.ownerSerial);
+    if (data.financier) setFinancier(data.financier);
+    if (data.emissionNorms) setEmissionNorms(data.emissionNorms);
+
+    // Client & Owner details from RC
     if (data.ownerName && !clientName) {
       setClientName(data.ownerName);
+    }
+    if (data.relationshipName) {
+      setRelationshipName(data.relationshipName);
+    }
+    if (data.ownerAddress && !clientAddress) {
+      setClientAddress(data.ownerAddress);
+    }
+    if (data.pincode && !pincode) {
+      setPincode(data.pincode);
     }
 
     setSuccessNotice(`Verified RC details applied successfully! (${data.detectedFieldCount || 0} fields extracted)`);
@@ -251,7 +325,7 @@ export function VehicleModal({
 
     const normReg = normalizeRegistrationNumber(registrationNumber);
     if (!normReg || normReg.length < 4) {
-      setErrorMsg('Please enter a valid registration number (e.g. KL-10-AB-1234).');
+      setErrorMsg('Please enter a valid registration number (e.g. KL-24-J-8996).');
       return;
     }
 
@@ -266,7 +340,7 @@ export function VehicleModal({
     }
 
     if (!rto.trim()) {
-      setErrorMsg('Please enter RTO office location (e.g. KL-10 Perinthalmanna).');
+      setErrorMsg('Please enter RTO office location (e.g. Kottarakkara SRTO).');
       return;
     }
 
@@ -307,10 +381,18 @@ export function VehicleModal({
 
         if (matchedExistingClient) {
           finalClientId = matchedExistingClient.id;
+          const clientUpdates: any = {};
           if (clientAddress && clientAddress !== matchedExistingClient.address) {
-            await updateClient(matchedExistingClient.id, {
-              address: clientAddress.trim(),
-            });
+            clientUpdates.address = clientAddress.trim();
+          }
+          if (relationshipName && relationshipName !== matchedExistingClient.relationshipName) {
+            clientUpdates.relationshipName = relationshipName.trim();
+          }
+          if (pincode && pincode !== matchedExistingClient.pincode) {
+            clientUpdates.pincode = pincode.trim();
+          }
+          if (Object.keys(clientUpdates).length > 0) {
+            await updateClient(matchedExistingClient.id, clientUpdates);
           }
         } else {
           // Check if client with this phone number already exists
@@ -325,6 +407,8 @@ export function VehicleModal({
               name: clientName.trim(),
               mobile: clientMobile.trim(),
               address: clientAddress.trim() || 'Address not specified',
+              relationshipName: relationshipName.trim() || undefined,
+              pincode: pincode.trim() || undefined,
               email: clientEmail.trim() || undefined,
               assignedAgentId: assignedAgentId || currentUser?.id || 'agent',
               status: 'ACTIVE',
@@ -350,12 +434,24 @@ export function VehicleModal({
         model: model.trim(),
         variant: variant.trim() || undefined,
         fuelType,
-        manufacturingYear: manufacturingYear ? Number(manufacturingYear) : undefined,
+        manufacturingYear: manufacturingYear !== '' ? Number(manufacturingYear) : undefined,
+        manufacturingMonthYear: manufacturingMonthYear.trim() || undefined,
         registrationDate: registrationDate || undefined,
         chassisNumber: chassisNumber.trim() || undefined,
         engineNumber: engineNumber.trim() || undefined,
         rto: rto.trim(),
         registrationValidity: registrationValidity || undefined,
+        color: color.trim() || undefined,
+        bodyType: bodyType.trim() || undefined,
+        seatingCapacity: seatingCapacity !== '' ? Number(seatingCapacity) : undefined,
+        unladenWeight: unladenWeight !== '' ? Number(unladenWeight) : undefined,
+        cubicCapacity: cubicCapacity !== '' ? Number(cubicCapacity) : undefined,
+        horsepower: horsepower.trim() || undefined,
+        wheelbase: wheelbase !== '' ? Number(wheelbase) : undefined,
+        cylinders: cylinders !== '' ? Number(cylinders) : undefined,
+        ownerSerial: ownerSerial !== '' ? Number(ownerSerial) : undefined,
+        financier: financier.trim() || undefined,
+        emissionNorms: emissionNorms.trim() || undefined,
         assignedAgentId,
         status: 'ACTIVE' as const,
         notes: notes.trim() || undefined,
@@ -539,61 +635,172 @@ export function VehicleModal({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
-                  {extractedData.registrationNumber && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Reg Number</span>
-                      <strong className="text-slate-900">{extractedData.registrationNumber}</strong>
-                    </div>
-                  )}
-                  {extractedData.ownerName && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Owner Name</span>
-                      <strong className="text-slate-900 truncate block">{extractedData.ownerName}</strong>
-                    </div>
-                  )}
-                  {extractedData.make && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Make</span>
-                      <strong className="text-slate-900">{extractedData.make}</strong>
-                    </div>
-                  )}
-                  {extractedData.model && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Model</span>
-                      <strong className="text-slate-900">{extractedData.model}</strong>
-                    </div>
-                  )}
-                  {extractedData.fuelType && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Fuel Type</span>
-                      <strong className="text-slate-900">{extractedData.fuelType}</strong>
-                    </div>
-                  )}
-                  {extractedData.manufacturingYear && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Mfg Year</span>
-                      <strong className="text-slate-900">{extractedData.manufacturingYear}</strong>
-                    </div>
-                  )}
-                  {extractedData.chassisNumber && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Chassis (VIN)</span>
-                      <strong className="text-slate-900 truncate block font-mono text-[11px]">{extractedData.chassisNumber}</strong>
-                    </div>
-                  )}
-                  {extractedData.engineNumber && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Engine No</span>
-                      <strong className="text-slate-900 truncate block font-mono text-[11px]">{extractedData.engineNumber}</strong>
-                    </div>
-                  )}
-                  {extractedData.rto && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">RTO Location</span>
-                      <strong className="text-slate-900 truncate block">{extractedData.rto}</strong>
-                    </div>
-                  )}
+                {/* Group 1: Registration & Owner */}
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+                    Registration & Owner Details
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    {extractedData.registrationNumber && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Reg Number</span>
+                        <strong className="text-slate-900 font-mono">{extractedData.registrationNumber}</strong>
+                      </div>
+                    )}
+                    {extractedData.registrationDate && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Reg Date</span>
+                        <strong className="text-slate-900">{extractedData.registrationDate}</strong>
+                      </div>
+                    )}
+                    {extractedData.registrationValidity && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Validity / Fitness</span>
+                        <strong className="text-slate-900">{extractedData.registrationValidity}</strong>
+                      </div>
+                    )}
+                    {extractedData.rto && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">RTO Authority</span>
+                        <strong className="text-slate-900 truncate block">{extractedData.rto}</strong>
+                      </div>
+                    )}
+                    {extractedData.ownerName && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-2">
+                        <span className="text-[10px] text-slate-500 block">Owner Name</span>
+                        <strong className="text-slate-900 truncate block">{extractedData.ownerName}</strong>
+                      </div>
+                    )}
+                    {extractedData.relationshipName && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-2">
+                        <span className="text-[10px] text-slate-500 block">Relationship (S/D/W of)</span>
+                        <strong className="text-slate-900 truncate block">{extractedData.relationshipName}</strong>
+                      </div>
+                    )}
+                    {extractedData.ownerAddress && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-3">
+                        <span className="text-[10px] text-slate-500 block">Full Address</span>
+                        <span className="text-slate-900 text-[11px] block truncate">{extractedData.ownerAddress}</span>
+                      </div>
+                    )}
+                    {extractedData.pincode && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">PIN Code</span>
+                        <strong className="text-slate-900 font-mono">{extractedData.pincode}</strong>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Group 2: Vehicle & Technical Specifications */}
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+                    Vehicle Specifications & Technical Identifiers
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    {extractedData.make && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Make</span>
+                        <strong className="text-slate-900">{extractedData.make}</strong>
+                      </div>
+                    )}
+                    {extractedData.model && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Model</span>
+                        <strong className="text-slate-900">{extractedData.model}</strong>
+                      </div>
+                    )}
+                    {extractedData.vehicleClass && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Vehicle Class</span>
+                        <strong className="text-slate-900 truncate block">{extractedData.vehicleClass}</strong>
+                      </div>
+                    )}
+                    {extractedData.fuelType && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Fuel Type</span>
+                        <strong className="text-slate-900">{extractedData.fuelType}</strong>
+                      </div>
+                    )}
+                    {extractedData.color && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Color</span>
+                        <strong className="text-slate-900">{extractedData.color}</strong>
+                      </div>
+                    )}
+                    {extractedData.bodyType && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Body Type</span>
+                        <strong className="text-slate-900">{extractedData.bodyType}</strong>
+                      </div>
+                    )}
+                    {extractedData.seatingCapacity !== undefined && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Seating Capacity</span>
+                        <strong className="text-slate-900">{extractedData.seatingCapacity} seats</strong>
+                      </div>
+                    )}
+                    {extractedData.unladenWeight !== undefined && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Unladen Weight</span>
+                        <strong className="text-slate-900">{extractedData.unladenWeight} kg</strong>
+                      </div>
+                    )}
+                    {extractedData.cubicCapacity !== undefined && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Engine Capacity</span>
+                        <strong className="text-slate-900">{extractedData.cubicCapacity} cc</strong>
+                      </div>
+                    )}
+                    {extractedData.horsepower && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Horsepower</span>
+                        <strong className="text-slate-900">{extractedData.horsepower}</strong>
+                      </div>
+                    )}
+                    {extractedData.wheelbase !== undefined && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Wheelbase</span>
+                        <strong className="text-slate-900">{extractedData.wheelbase} mm</strong>
+                      </div>
+                    )}
+                    {extractedData.cylinders !== undefined && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Cylinders</span>
+                        <strong className="text-slate-900">{extractedData.cylinders}</strong>
+                      </div>
+                    )}
+                    {extractedData.chassisNumber && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-2">
+                        <span className="text-[10px] text-slate-500 block">Chassis (VIN)</span>
+                        <strong className="text-slate-900 truncate block font-mono text-[11px]">{extractedData.chassisNumber}</strong>
+                      </div>
+                    )}
+                    {extractedData.engineNumber && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-2">
+                        <span className="text-[10px] text-slate-500 block">Engine Number</span>
+                        <strong className="text-slate-900 truncate block font-mono text-[11px]">{extractedData.engineNumber}</strong>
+                      </div>
+                    )}
+                    {extractedData.manufacturingMonthYear && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-2">
+                        <span className="text-[10px] text-slate-500 block">Mfg Month / Year</span>
+                        <strong className="text-slate-900">{extractedData.manufacturingMonthYear}</strong>
+                      </div>
+                    )}
+                    {extractedData.ownerSerial !== undefined && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Owner Serial</span>
+                        <strong className="text-slate-900">Serial #{extractedData.ownerSerial}</strong>
+                      </div>
+                    )}
+                    {extractedData.emissionNorms && (
+                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                        <span className="text-[10px] text-slate-500 block">Emission Norms</span>
+                        <strong className="text-slate-900">{extractedData.emissionNorms}</strong>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <p className="text-[11px] text-slate-500 pt-1">
@@ -763,8 +970,24 @@ export function VehicleModal({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Input
+                      label="Relationship Name (Son / Daughter / Wife of)"
+                      placeholder="e.g. ALEX JOHN"
+                      value={relationshipName}
+                      onChange={(e) => setRelationshipName(e.target.value)}
+                      helperText="Recorded on RC front card"
+                    />
+                    <Input
+                      label="PIN Code"
+                      placeholder="e.g. 691531"
+                      value={pincode}
+                      onChange={(e) => setPincode(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input
                       label="Client Address / Location"
-                      placeholder="e.g. Perinthalmanna, Malappuram"
+                      placeholder="e.g. Mamachenvila Vadakkethil, Kottarakkara, Kollam"
                       value={clientAddress}
                       onChange={(e) => setClientAddress(e.target.value)}
                     />
@@ -788,10 +1011,10 @@ export function VehicleModal({
                 </div>
                 <div>
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Vehicle Specifications
+                    Vehicle Specifications & Classification
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    Registration number, brand, model, and category
+                    Registration number, brand, model, vehicle class, and category
                   </p>
                 </div>
               </div>
@@ -800,7 +1023,7 @@ export function VehicleModal({
                 <Input
                   label="Registration Number"
                   required
-                  placeholder="e.g. KL-10-AB-1234"
+                  placeholder="e.g. KL-24-J-8996"
                   value={registrationNumber}
                   onChange={(e) => setRegistrationNumber(e.target.value)}
                   helperText="Auto-formatted & normalized for duplicate check"
@@ -824,9 +1047,9 @@ export function VehicleModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Input
-                  label="Make (Brand)"
+                  label="Make (Manufacturer)"
                   required
-                  placeholder="e.g. Toyota, Maruti, Tata"
+                  placeholder="e.g. HONDA, Toyota, Maruti"
                   value={make}
                   onChange={(e) => setMake(e.target.value)}
                 />
@@ -834,16 +1057,16 @@ export function VehicleModal({
                 <Input
                   label="Model"
                   required
-                  placeholder="e.g. Innova, Swift, Nexon"
+                  placeholder="e.g. HONDA DIO, Innova"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
                 />
 
                 <Input
-                  label="Variant / Trim (Optional)"
-                  placeholder="e.g. 2.4 VX, ZXI+"
-                  value={variant}
-                  onChange={(e) => setVariant(e.target.value)}
+                  label="Vehicle Class (from RC)"
+                  placeholder="e.g. M-Cycle/Scooter, Motor Car"
+                  value={vehicleClass}
+                  onChange={(e) => setVehicleClass(e.target.value)}
                 />
               </div>
 
@@ -866,20 +1089,143 @@ export function VehicleModal({
                   type="number"
                   value={manufacturingYear}
                   onChange={(e) => setManufacturingYear(e.target.value ? Number(e.target.value) : '')}
-                  placeholder="e.g. 2022"
+                  placeholder="e.g. 2015"
                 />
 
                 <Input
-                  label="RTO Office Location"
+                  label="Mfg Month / Year"
+                  placeholder="e.g. January 2015 (1-2015)"
+                  value={manufacturingMonthYear}
+                  onChange={(e) => setManufacturingMonthYear(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="RTO Office Authority"
                   required
-                  placeholder="e.g. KL-10 Perinthalmanna"
+                  placeholder="e.g. Kottarakkara SRTO"
                   value={rto}
                   onChange={(e) => setRto(e.target.value)}
+                />
+
+                <Input
+                  label="Variant / Trim (Optional)"
+                  placeholder="e.g. Standard, 2.4 VX, ZXI+"
+                  value={variant}
+                  onChange={(e) => setVariant(e.target.value)}
                 />
               </div>
             </div>
 
-            {/* 3. TECHNICAL & REGISTRATION IDENTIFIERS */}
+            {/* 3. DETAILED RC SMART CARD TECHNICAL & DIMENSION SPECIFICATIONS */}
+            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    RC Technical Specifications & Dimensions (Kerala Smart Card)
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Color, body type, seating capacity, weight, CC, horsepower, wheelbase, and cylinders
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Input
+                  label="Color"
+                  placeholder="e.g. M A Gray M"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                />
+
+                <Input
+                  label="Body Type"
+                  placeholder="e.g. SOLO, Saloon"
+                  value={bodyType}
+                  onChange={(e) => setBodyType(e.target.value)}
+                />
+
+                <Input
+                  label="Seating Capacity"
+                  type="number"
+                  placeholder="e.g. 2 or 5"
+                  value={seatingCapacity}
+                  onChange={(e) => setSeatingCapacity(e.target.value ? Number(e.target.value) : '')}
+                  helperText="Number of seats"
+                />
+
+                <Input
+                  label="Unladen Weight (kg)"
+                  type="number"
+                  placeholder="e.g. 111"
+                  value={unladenWeight}
+                  onChange={(e) => setUnladenWeight(e.target.value ? Number(e.target.value) : '')}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Input
+                  label="Engine Capacity (cc)"
+                  type="number"
+                  placeholder="e.g. 110"
+                  value={cubicCapacity}
+                  onChange={(e) => setCubicCapacity(e.target.value ? Number(e.target.value) : '')}
+                />
+
+                <Input
+                  label="Horsepower (BHP/Kw)"
+                  placeholder="e.g. 8 BHP"
+                  value={horsepower}
+                  onChange={(e) => setHorsepower(e.target.value)}
+                />
+
+                <Input
+                  label="Wheelbase (mm)"
+                  type="number"
+                  placeholder="e.g. 1238"
+                  value={wheelbase}
+                  onChange={(e) => setWheelbase(e.target.value ? Number(e.target.value) : '')}
+                />
+
+                <Input
+                  label="No. of Cylinders"
+                  type="number"
+                  placeholder="e.g. 1"
+                  value={cylinders}
+                  onChange={(e) => setCylinders(e.target.value ? Number(e.target.value) : '')}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Input
+                  label="Owner Serial Number"
+                  type="number"
+                  placeholder="e.g. 1 (1st Owner)"
+                  value={ownerSerial}
+                  onChange={(e) => setOwnerSerial(e.target.value ? Number(e.target.value) : '')}
+                />
+
+                <Input
+                  label="Financier / Hypothecation"
+                  placeholder="e.g. Not specified / HDFC Bank"
+                  value={financier}
+                  onChange={(e) => setFinancier(e.target.value)}
+                />
+
+                <Input
+                  label="Emission Norms"
+                  placeholder="e.g. Not Available / BS IV / BS VI"
+                  value={emissionNorms}
+                  onChange={(e) => setEmissionNorms(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* 4. TECHNICAL & REGISTRATION IDENTIFIERS */}
             <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                 <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
@@ -898,14 +1244,14 @@ export function VehicleModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Input
                   label="Chassis Number (VIN)"
-                  placeholder="e.g. MBJ11BB400123..."
+                  placeholder="e.g. ME4JF392AF7270451"
                   value={chassisNumber}
                   onChange={(e) => setChassisNumber(e.target.value)}
                 />
 
                 <Input
-                  label="Engine Number"
-                  placeholder="e.g. 2GDF987654..."
+                  label="Engine / Motor Number"
+                  placeholder="e.g. JF39E70270467"
                   value={engineNumber}
                   onChange={(e) => setEngineNumber(e.target.value)}
                 />
@@ -917,13 +1263,15 @@ export function VehicleModal({
                   type="date"
                   value={registrationDate}
                   onChange={(e) => setRegistrationDate(e.target.value)}
+                  helperText="Date of Registration on RC"
                 />
 
                 <Input
-                  label="RC Fitness / Registration Validity"
+                  label="RC Registration Validity / Fitness"
                   type="date"
                   value={registrationValidity}
                   onChange={(e) => setRegistrationValidity(e.target.value)}
+                  helperText="Validity date on RC smart card"
                 />
               </div>
             </div>

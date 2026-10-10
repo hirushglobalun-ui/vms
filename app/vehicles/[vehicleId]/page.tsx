@@ -180,12 +180,22 @@ export default function VehicleDetailPage() {
                 ) : (
                   'N/A'
                 )}
+                {client?.relationshipName && (
+                  <span className="text-slate-500 font-normal">
+                    (S/D/W: {client.relationshipName})
+                  </span>
+                )}
               </div>
 
               {client && (
                 <div className="flex items-center gap-1.5 font-mono">
                   <Phone className="w-3.5 h-3.5 text-slate-400" />
                   {client.mobile}
+                  {client.pincode && (
+                    <span className="text-slate-400 font-sans">
+                      • PIN {client.pincode}
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -257,13 +267,14 @@ export default function VehicleDetailPage() {
       <Card>
         <CardHeader className="py-3 px-5 bg-slate-50/70 border-b border-slate-100">
           <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-500">
-            Vehicle Specification & Registration Details
+            Vehicle Specification & RC Smart Card Technical Details
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-5">
+        <CardContent className="p-5 space-y-4">
+          {/* Primary RTO & Engine Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
             <div>
-              <span className="text-slate-400 font-medium block">RTO Location</span>
+              <span className="text-slate-400 font-medium block">RTO Authority</span>
               <span className="font-bold text-slate-900 mt-0.5 block">{vehicle.rto}</span>
             </div>
 
@@ -273,29 +284,144 @@ export default function VehicleDetailPage() {
             </div>
 
             <div>
-              <span className="text-slate-400 font-medium block">Mfg. Year</span>
+              <span className="text-slate-400 font-medium block">Vehicle Class</span>
+              <span className="font-semibold text-slate-800 mt-0.5 block truncate">
+                {vehicle.vehicleClass || vehicle.vehicleType.replace('_', ' ')}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-slate-400 font-medium block">Mfg. Date / Year</span>
               <span className="font-bold text-slate-900 mt-0.5 block">
-                {vehicle.manufacturingYear || 'N/A'}
+                {vehicle.manufacturingMonthYear || vehicle.manufacturingYear || 'N/A'}
               </span>
             </div>
 
             <div>
-              <span className="text-slate-400 font-medium block">Reg. Validity</span>
+              <span className="text-slate-400 font-medium block">Reg. Date</span>
+              <span className="font-mono font-medium text-slate-700 mt-0.5 block">
+                {vehicle.registrationDate || 'N/A'}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-slate-400 font-medium block">RC Validity / Fitness</span>
+              <span className="font-mono font-bold text-blue-700 mt-0.5 block">
+                {vehicle.registrationValidity || 'N/A'}
+              </span>
+            </div>
+          </div>
+
+          {/* Technical Specifications (Color, Seating, Weight, CC, HP, Dimensions) */}
+          <div className="pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 text-xs">
+            {vehicle.color && (
+              <div>
+                <span className="text-slate-400 font-medium block">Color</span>
+                <span className="font-semibold text-slate-900 mt-0.5 block">{vehicle.color}</span>
+              </div>
+            )}
+
+            {vehicle.bodyType && (
+              <div>
+                <span className="text-slate-400 font-medium block">Body Type</span>
+                <span className="font-semibold text-slate-900 mt-0.5 block">{vehicle.bodyType}</span>
+              </div>
+            )}
+
+            {vehicle.seatingCapacity !== undefined && vehicle.seatingCapacity !== null && (
+              <div>
+                <span className="text-slate-400 font-medium block">Seating Capacity</span>
+                <span className="font-semibold text-slate-900 mt-0.5 block">
+                  {vehicle.seatingCapacity} Persons
+                </span>
+              </div>
+            )}
+
+            {vehicle.unladenWeight !== undefined && vehicle.unladenWeight !== null && (
+              <div>
+                <span className="text-slate-400 font-medium block">Unladen Weight</span>
+                <span className="font-semibold text-slate-900 mt-0.5 block">
+                  {vehicle.unladenWeight} kg
+                </span>
+              </div>
+            )}
+
+            {vehicle.cubicCapacity !== undefined && vehicle.cubicCapacity !== null && (
+              <div>
+                <span className="text-slate-400 font-medium block">Engine Capacity</span>
+                <span className="font-semibold text-slate-900 mt-0.5 block">
+                  {vehicle.cubicCapacity} cc
+                </span>
+              </div>
+            )}
+
+            {vehicle.horsepower && (
+              <div>
+                <span className="text-slate-400 font-medium block">Horse Power</span>
+                <span className="font-semibold text-slate-900 mt-0.5 block">
+                  {vehicle.horsepower}
+                </span>
+              </div>
+            )}
+
+            {vehicle.wheelbase !== undefined && vehicle.wheelbase !== null && (
+              <div>
+                <span className="text-slate-400 font-medium block">Wheelbase</span>
+                <span className="font-semibold text-slate-900 mt-0.5 block">
+                  {vehicle.wheelbase} mm
+                </span>
+              </div>
+            )}
+
+            {vehicle.cylinders !== undefined && vehicle.cylinders !== null && (
+              <div>
+                <span className="text-slate-400 font-medium block">Cylinders</span>
+                <span className="font-semibold text-slate-900 mt-0.5 block">
+                  {vehicle.cylinders}
+                </span>
+              </div>
+            )}
+
+            {vehicle.ownerSerial !== undefined && vehicle.ownerSerial !== null && (
+              <div>
+                <span className="text-slate-400 font-medium block">Owner Serial</span>
+                <span className="font-semibold text-slate-900 mt-0.5 block">
+                  #{vehicle.ownerSerial} (Ownership)
+                </span>
+              </div>
+            )}
+
+            {vehicle.financier && (
+              <div>
+                <span className="text-slate-400 font-medium block">Financier / Hypo</span>
+                <span className="font-semibold text-slate-900 mt-0.5 block truncate">
+                  {vehicle.financier}
+                </span>
+              </div>
+            )}
+
+            {vehicle.emissionNorms && (
+              <div>
+                <span className="text-slate-400 font-medium block">Emission Norms</span>
+                <span className="font-semibold text-slate-900 mt-0.5 block">
+                  {vehicle.emissionNorms}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* VIN & Engine Numbers */}
+          <div className="pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div>
+              <span className="text-slate-400 font-medium block">Chassis Number (VIN)</span>
               <span className="font-mono font-bold text-slate-900 mt-0.5 block">
-                {vehicle.registrationValidity || '2036-04-11'}
-              </span>
-            </div>
-
-            <div>
-              <span className="text-slate-400 font-medium block">Chassis No. (VIN)</span>
-              <span className="font-mono font-semibold text-slate-700 mt-0.5 block truncate">
                 {vehicle.chassisNumber || 'N/A'}
               </span>
             </div>
 
             <div>
-              <span className="text-slate-400 font-medium block">Engine No.</span>
-              <span className="font-mono font-semibold text-slate-700 mt-0.5 block truncate">
+              <span className="text-slate-400 font-medium block">Engine / Motor Number</span>
+              <span className="font-mono font-bold text-slate-900 mt-0.5 block">
                 {vehicle.engineNumber || 'N/A'}
               </span>
             </div>
