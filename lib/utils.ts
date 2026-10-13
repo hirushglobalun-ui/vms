@@ -37,3 +37,42 @@ export function formatCurrency(amount?: number): string {
     maximumFractionDigits: 0,
   }).format(amount);
 }
+
+export interface PaymentBalanceSummary {
+  totalCost: number;
+  amountReceived: number;
+  balanceAmount: number;
+  paymentStatus: 'SETTLED' | 'BALANCE_DUE' | 'REFUND_DUE';
+  label: string;
+}
+
+export function calculatePaymentBalance(totalCost: number = 0, amountReceived: number = 0): PaymentBalanceSummary {
+  const diff = Number(totalCost || 0) - Number(amountReceived || 0);
+  if (diff > 0) {
+    return {
+      totalCost: Number(totalCost || 0),
+      amountReceived: Number(amountReceived || 0),
+      balanceAmount: diff,
+      paymentStatus: 'BALANCE_DUE',
+      label: `Due from Client: ₹${diff.toLocaleString('en-IN')}`,
+    };
+  } else if (diff < 0) {
+    const refund = Math.abs(diff);
+    return {
+      totalCost: Number(totalCost || 0),
+      amountReceived: Number(amountReceived || 0),
+      balanceAmount: refund,
+      paymentStatus: 'REFUND_DUE',
+      label: `Return to Client: ₹${refund.toLocaleString('en-IN')}`,
+    };
+  } else {
+    return {
+      totalCost: Number(totalCost || 0),
+      amountReceived: Number(amountReceived || 0),
+      balanceAmount: 0,
+      paymentStatus: 'SETTLED',
+      label: totalCost > 0 ? `Fully Settled (₹${Number(totalCost).toLocaleString('en-IN')})` : 'Settled',
+    };
+  }
+}
+

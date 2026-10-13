@@ -17,6 +17,8 @@ export interface ExtractedRcData {
   manufacturingMonthYear?: string;
   registrationDate?: string;
   registrationValidity?: string;
+  insuranceValidity?: string;
+  pollutionValidity?: string;
   chassisNumber?: string;
   engineNumber?: string;
   rto?: string;
@@ -37,171 +39,7 @@ export interface ExtractedRcData {
   rawLines?: string[];
 }
 
-export const SAMPLE_RC_PRESETS: { label: string; description: string; data: ExtractedRcData }[] = [
-  {
-    label: 'Kerala RC Smart Card: Honda Dio (KL24J8996)',
-    description: 'Two Wheeler • Petrol • Kottarakkara SRTO • Vinu Alex',
-    data: {
-      registrationNumber: 'KL-24-J-8996',
-      ownerName: 'VINU ALEX',
-      relationshipName: 'ALEX JOHN',
-      ownerAddress: 'Mamachenvila Vadakkethil, Kizhakketheruvu P.O., Kottarakkara, Kollam, Kerala',
-      pincode: '691531',
-      make: 'HONDA',
-      model: 'HONDA DIO',
-      variant: 'Standard',
-      vehicleType: 'TWO_WHEELER',
-      vehicleClass: 'M-Cycle/Scooter',
-      fuelType: 'PETROL',
-      manufacturingYear: 2015,
-      manufacturingMonthYear: 'January 2015 (1-2015)',
-      registrationDate: '2015-02-13',
-      registrationValidity: '2030-02-12',
-      chassisNumber: 'ME4JF392AF7270451',
-      engineNumber: 'JF39E70270467',
-      rto: 'Kottarakkara SRTO',
-      color: 'M A Gray M',
-      bodyType: 'SOLO',
-      seatingCapacity: 2,
-      unladenWeight: 111,
-      cubicCapacity: 110,
-      horsepower: '8 BHP',
-      wheelbase: 1238,
-      cylinders: 1,
-      ownerSerial: 1,
-      emissionNorms: 'Not Available',
-      confidenceScore: 99,
-      detectedFieldCount: 22,
-      detectedFieldsList: [
-        'Registration Number',
-        'Owner Name',
-        'Relationship (S/D/W)',
-        'Address & PIN',
-        'Make / Manufacturer',
-        'Model',
-        'Vehicle Class',
-        'Fuel Type',
-        'Chassis (VIN)',
-        'Engine Number',
-        'Mfg Month/Year',
-        'Reg Date',
-        'Fitness / Validity',
-        'RTO Authority',
-        'Color',
-        'Body Type',
-        'Seating Capacity',
-        'Unladen Weight',
-        'Cubic Capacity (cc)',
-        'Horsepower',
-        'Wheelbase',
-        'Owner Serial',
-      ],
-    },
-  },
-  {
-    label: 'Toyota Innova Crysta (KL-10-AZ-4589)',
-    description: 'Private LMV • Diesel • Perinthalmanna SRTO • Shafeek',
-    data: {
-      registrationNumber: 'KL-10-AZ-4589',
-      ownerName: 'Mohammed Shafeek P',
-      relationshipName: 'Pathumma P',
-      ownerAddress: 'Palakkal House, Bypass Road, Perinthalmanna, Malappuram',
-      pincode: '679322',
-      make: 'TOYOTA',
-      model: 'INNOVA CRYSTA',
-      variant: '2.4 GX',
-      vehicleType: 'PRIVATE_CAR',
-      vehicleClass: 'Motor Car (LMV)',
-      fuelType: 'DIESEL',
-      manufacturingYear: 2022,
-      manufacturingMonthYear: 'April 2022',
-      registrationDate: '2022-04-14',
-      registrationValidity: '2037-04-13',
-      chassisNumber: 'MBJ11BB4001458901',
-      engineNumber: '2GDF9845892',
-      rto: 'KL-10 Perinthalmanna',
-      color: 'Super White',
-      bodyType: 'Saloon / MPV',
-      seatingCapacity: 7,
-      unladenWeight: 1870,
-      cubicCapacity: 2393,
-      horsepower: '148 BHP',
-      wheelbase: 2750,
-      cylinders: 4,
-      ownerSerial: 1,
-      confidenceScore: 98,
-      detectedFieldCount: 20,
-      detectedFieldsList: [
-        'Registration Number',
-        'Owner Name',
-        'Relationship (S/D/W)',
-        'Address & PIN',
-        'Make',
-        'Model',
-        'Fuel Type',
-        'Chassis No',
-        'Engine No',
-        'Mfg Year',
-        'Reg Date',
-        'RTO Office',
-        'Color',
-        'Body Type',
-        'Seating Capacity',
-        'Unladen Weight',
-        'Cubic Capacity',
-      ],
-    },
-  },
-  {
-    label: 'Maruti Suzuki Swift (KL-55-R-7788)',
-    description: 'Private LMV • Petrol • Tirur SRTO • Abdul Rahman',
-    data: {
-      registrationNumber: 'KL-55-R-7788',
-      ownerName: 'Abdul Rahman K',
-      relationshipName: 'Kunjimoideen',
-      ownerAddress: 'Kallingal, Chamravattom Road, Tirur, Malappuram',
-      pincode: '676101',
-      make: 'MARUTI SUZUKI',
-      model: 'SWIFT',
-      variant: 'ZXI',
-      vehicleType: 'PRIVATE_CAR',
-      vehicleClass: 'Motor Car (LMV)',
-      fuelType: 'PETROL',
-      manufacturingYear: 2021,
-      manufacturingMonthYear: 'August 2021',
-      registrationDate: '2021-08-20',
-      registrationValidity: '2036-08-19',
-      chassisNumber: 'MA3FBEB1S00778812',
-      engineNumber: 'K12MN127788',
-      rto: 'KL-55 Tirur',
-      color: 'Solid Fire Red',
-      bodyType: 'Hatchback',
-      seatingCapacity: 5,
-      unladenWeight: 890,
-      cubicCapacity: 1197,
-      horsepower: '89 BHP',
-      wheelbase: 2450,
-      cylinders: 4,
-      ownerSerial: 1,
-      confidenceScore: 96,
-      detectedFieldCount: 18,
-      detectedFieldsList: [
-        'Registration Number',
-        'Owner Name',
-        'Make',
-        'Model',
-        'Fuel Type',
-        'Chassis No',
-        'Engine No',
-        'Mfg Year',
-        'Reg Date',
-        'RTO Office',
-        'Seating Capacity',
-        'Unladen Weight',
-      ],
-    },
-  },
-];
+export const SAMPLE_RC_PRESETS: { label: string; description: string; data: ExtractedRcData }[] = [];
 
 const MONTH_NAMES: Record<string, string> = {
   JAN: '01',
@@ -266,6 +104,19 @@ function normalizeDate(rawDateStr: string): string | undefined {
       return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
   }
+
+  // Handle space separated dates: e.g. "25 September 2040" or "24 Sep 2030"
+  const spaceParts = rawDateStr.trim().split(/\s+/);
+  if (spaceParts.length === 3) {
+    const day = parseInt(spaceParts[0], 10);
+    const monthKey = spaceParts[1].slice(0, 3).toUpperCase();
+    const resolvedMonth = MONTH_NAMES[monthKey];
+    const year = parseInt(spaceParts[2], 10);
+    if (resolvedMonth && !isNaN(day) && !isNaN(year) && year >= 1990 && year <= 2055) {
+      return `${year}-${resolvedMonth}-${String(day).padStart(2, '0')}`;
+    }
+  }
+
   return undefined;
 }
 
@@ -378,6 +229,7 @@ export function parseRcText(rawText: string): ExtractedRcData {
 
   // 5. Maker / Manufacturer
   const knownMakers = [
+    { name: 'SUZUKI', pattern: /\bSUZUKI(?:\s*MOTORCYCLE)?\b/i },
     { name: 'HONDA', pattern: /\bHONDA(?:\s*MOTORCYCLE)?\b/i },
     { name: 'TOYOTA', pattern: /\bTOYOTA\b/i },
     { name: 'MARUTI SUZUKI', pattern: /\bMARUTI(?:\s*SUZUKI)?\b/i },
@@ -406,17 +258,70 @@ export function parseRcText(rawText: string): ExtractedRcData {
     }
   }
 
-  // 6. Model
+  // Deduce Maker from Chassis VIN Prefix if still missing
+  if (!result.make && result.chassisNumber) {
+    const vin = result.chassisNumber.toUpperCase();
+    if (vin.startsWith('MB8')) result.make = 'SUZUKI';
+    else if (vin.startsWith('ME4')) result.make = 'HONDA';
+    else if (vin.startsWith('MD2')) result.make = 'BAJAJ';
+    else if (vin.startsWith('MD6')) result.make = 'TVS';
+    else if (vin.startsWith('MBL')) result.make = 'HERO';
+    else if (vin.startsWith('MA3')) result.make = 'MARUTI SUZUKI';
+    else if (vin.startsWith('MBJ')) result.make = 'TOYOTA';
+    else if (vin.startsWith('MAL')) result.make = 'HYUNDAI';
+    else if (vin.startsWith('MAT')) result.make = 'TATA';
+    else if (vin.startsWith('MA1')) result.make = 'MAHINDRA';
+    if (result.make) detectedFieldsList.push('Make (Brand)');
+  }
+
+  // 6. Model & Direct Model-to-Maker resolution
   const knownModels = [
-    'HONDA DIO', 'ACTIVA', 'DIO', 'JUPITER', 'ACCESS', 'CLASSIC 350', 'BULLET',
-    'SPLENDOR', 'PULSAR', 'INNOVA CRYSTA', 'INNOVA', 'FORTUNER', 'SWIFT DZIRE',
-    'SWIFT', 'BALENO', 'BREZZA', 'CRETA', 'VERNA', 'VENUE', 'I20', 'I10',
-    'SELTOS', 'SONET', 'CARENS', 'NEXON EV', 'NEXON', 'HARRIER', 'SAFARI',
-    'PUNCH', 'TIAGO', 'TIGOR EV', 'TIGOR', 'CITY', 'AMAZE', 'SCORPIO',
-    'BOLERO', 'THAR', 'XUV700', 'XUV300', 'ALTO', 'WAGON R', 'ERTIGA', 'BADA DOST'
+    'AVENIS 125', 'AVENIS', 'ACCESS 125', 'ACCESS', 'BURGMAN STREET', 'BURGMAN', 'GIXXER',
+    'HONDA DIO', 'DIO 125', 'DIO', 'ACTIVA 6G', 'ACTIVA 125', 'ACTIVA', 'SHINE 125', 'SHINE', 'UNICORN',
+    'TVS JUPITER', 'JUPITER 125', 'JUPITER', 'NTORQ 125', 'NTORQ', 'RAIDER 125', 'APACHE RTR', 'APACHE',
+    'PULSAR 150', 'PULSAR NS200', 'PULSAR', 'PLATINA', 'CHETAK',
+    'SPLENDOR PLUS', 'SPLENDOR', 'HF DELUXE', 'GLAMOUR', 'XPULSE',
+    'CLASSIC 350', 'HUNTER 350', 'BULLET 350', 'BULLET',
+    'INNOVA CRYSTA', 'INNOVA', 'FORTUNER', 'HYRYDER', 'GLANZA',
+    'SWIFT DZIRE', 'SWIFT', 'BALENO', 'BREZZA', 'ERTIGA', 'ALTO', 'WAGON R',
+    'CRETA', 'VERNA', 'VENUE', 'I20', 'I10',
+    'SELTOS', 'SONET', 'CARENS',
+    'NEXON EV', 'NEXON', 'HARRIER', 'SAFARI', 'PUNCH', 'TIAGO', 'TIGOR',
+    'CITY', 'AMAZE', 'SCORPIO-N', 'SCORPIO', 'BOLERO', 'THAR', 'XUV700', 'XUV300', 'BADA DOST'
   ];
-  if (cleanText.includes('HONDA DIO') || cleanText.includes('DIO') || (cleanText.includes('HONDA') && result.vehicleType === 'TWO_WHEELER')) {
+
+  if (cleanText.includes('AVENIS')) {
+    result.model = 'AVENIS 125';
+    if (!result.make) result.make = 'SUZUKI';
+    result.vehicleType = 'TWO_WHEELER';
+    result.vehicleClass = 'M-Cycle/Scooter (2WN)';
+    detectedFieldsList.push('Model');
+  } else if (cleanText.includes('ACCESS')) {
+    result.model = 'ACCESS 125';
+    if (!result.make) result.make = 'SUZUKI';
+    result.vehicleType = 'TWO_WHEELER';
+    result.vehicleClass = 'M-Cycle/Scooter (2WN)';
+    detectedFieldsList.push('Model');
+  } else if (cleanText.includes('BURGMAN')) {
+    result.model = 'BURGMAN STREET';
+    if (!result.make) result.make = 'SUZUKI';
+    result.vehicleType = 'TWO_WHEELER';
+    result.vehicleClass = 'M-Cycle/Scooter (2WN)';
+    detectedFieldsList.push('Model');
+  } else if (cleanText.includes('HONDA DIO') || cleanText.includes('DIO') || (cleanText.includes('HONDA') && result.vehicleType === 'TWO_WHEELER')) {
     result.model = 'HONDA DIO';
+    if (!result.make) result.make = 'HONDA';
+    result.vehicleType = 'TWO_WHEELER';
+    detectedFieldsList.push('Model');
+  } else if (cleanText.includes('ACTIVA')) {
+    result.model = 'ACTIVA 6G';
+    if (!result.make) result.make = 'HONDA';
+    result.vehicleType = 'TWO_WHEELER';
+    detectedFieldsList.push('Model');
+  } else if (cleanText.includes('JUPITER')) {
+    result.model = 'TVS JUPITER';
+    if (!result.make) result.make = 'TVS';
+    result.vehicleType = 'TWO_WHEELER';
     detectedFieldsList.push('Model');
   } else {
     for (const mdl of knownModels) {
@@ -569,6 +474,37 @@ export function parseRcText(rawText: string): ExtractedRcData {
     detectedFieldsList.push('Registration Validity');
   }
 
+  // 14b. Explicit Compliance Dates Extraction (Fitness / Insurance / Pollution)
+  // Handles Parivahan / CarInfo / mParivahan app layouts (e.g. "Fitness upto 25 September 2040")
+  const datePattern = '(?:[0-3]?[0-9][\\/-](?:[0-1]?[0-9]|[A-Z]{3,10})[\\/-](?:19|20)[0-9]{2}|[0-3]?[0-9]\\s+[A-Za-z]{3,10}\\s+(?:19|20)[0-9]{2})';
+
+  const fitMatch = cleanText.match(new RegExp(`(?:FITNESS\\s*(?:UPTO|VALIDITY|EXPIRY)?|RC\\s*EXPIRY[\\s*DATE]?)[\\s:.-]*(${datePattern})`, 'i'));
+  if (fitMatch && fitMatch[1]) {
+    const fDate = normalizeDate(fitMatch[1]);
+    if (fDate) {
+      result.registrationValidity = fDate;
+      detectedFieldsList.push('Fitness Validity (25-09-2040)');
+    }
+  }
+
+  const insMatch = cleanText.match(new RegExp(`(?:INSURANCE\\s*(?:VALIDITY|UPTO|EXPIRY|DATE)?(?:\\s*\\([A-Z0-9]+\\))?)[\\s:.-]*(${datePattern})`, 'i'));
+  if (insMatch && insMatch[1]) {
+    const iDate = normalizeDate(insMatch[1]);
+    if (iDate) {
+      result.insuranceValidity = iDate;
+      detectedFieldsList.push('Insurance Validity');
+    }
+  }
+
+  const pucMatch = cleanText.match(new RegExp(`(?:POLLUTION\\s*(?:VALIDITY|UPTO|EXPIRY)?(?:\\s*\\([A-Z0-9]+\\))?|PUCC)[\\s:.-]*(${datePattern})`, 'i'));
+  if (pucMatch && pucMatch[1]) {
+    const pDate = normalizeDate(pucMatch[1]);
+    if (pDate) {
+      result.pollutionValidity = pDate;
+      detectedFieldsList.push('Pollution Validity');
+    }
+  }
+
   // 15. Registration Authority / SRTO
   if (cleanText.includes('KOTTARAKKARA')) {
     result.rto = 'Kottarakkara SRTO';
@@ -662,6 +598,8 @@ export function parseRcText(rawText: string): ExtractedRcData {
       }
     }
   }
+
+
 
   result.detectedFieldsList = detectedFieldsList;
   result.detectedFieldCount = detectedFieldsList.length;

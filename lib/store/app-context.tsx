@@ -101,6 +101,9 @@ interface AppContextType {
       newExpiryDate?: string;
       newIssueDate?: string;
       newAmount?: number;
+      amountReceived?: number;
+      balanceAmount?: number;
+      paymentStatus?: 'SETTLED' | 'BALANCE_DUE' | 'REFUND_DUE';
       newDocumentNumber?: string;
       notes?: string;
       fileName?: string;
@@ -210,11 +213,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (storedUser) setCurrentUser(JSON.parse(storedUser));
         if (storedClients) setClients(JSON.parse(storedClients));
-        if (storedVehicles) setVehicles(JSON.parse(storedVehicles));
-        if (storedDocs) setDocuments(JSON.parse(storedDocs));
-        if (storedTasks) setTasks(JSON.parse(storedTasks));
-        if (storedLogs) setActivityLogs(JSON.parse(storedLogs));
-        if (storedNotifs) setNotifications(JSON.parse(storedNotifs));
+        const isDummyVeh = (id: string) => /^veh_[0-9]{1,3}$/.test(id);
+        const isDummyDoc = (id: string) => /^doc_[0-9]{1,3}$/.test(id);
+        const isDummyTask = (id: string) => /^task_[0-9]{1,3}$/.test(id);
+        const isDummyNotif = (id: string) => /^notif_[0-9]{1,3}$/.test(id);
+        const isDummyLog = (id: string) => /^log_[0-9]{1,3}$/.test(id);
+
+        if (storedVehicles) {
+          const parsed: Vehicle[] = JSON.parse(storedVehicles);
+          const cleaned = parsed.filter((v) => !isDummyVeh(v.id));
+          setVehicles(cleaned);
+          saveState('vehicles', cleaned);
+        }
+        if (storedDocs) {
+          const parsed: VehicleDocument[] = JSON.parse(storedDocs);
+          const cleaned = parsed.filter((d) => !isDummyDoc(d.id) && !isDummyVeh(d.vehicleId));
+          setDocuments(cleaned);
+          saveState('documents', cleaned);
+        }
+        if (storedTasks) {
+          const parsed: Task[] = JSON.parse(storedTasks);
+          const cleaned = parsed.filter((t) => !isDummyTask(t.id) && (!t.vehicleId || !isDummyVeh(t.vehicleId)));
+          setTasks(cleaned);
+          saveState('tasks', cleaned);
+        }
+        if (storedLogs) {
+          const parsed: ActivityLog[] = JSON.parse(storedLogs);
+          const cleaned = parsed.filter((l) => !isDummyLog(l.id) && (!l.entityId || !isDummyVeh(l.entityId)));
+          setActivityLogs(cleaned);
+          saveState('activityLogs', cleaned);
+        }
+        if (storedNotifs) {
+          const parsed: Notification[] = JSON.parse(storedNotifs);
+          const cleaned = parsed.filter((n) => !isDummyNotif(n.id) && (!n.relatedVehicleId || !isDummyVeh(n.relatedVehicleId)));
+          setNotifications(cleaned);
+          saveState('notifications', cleaned);
+        }
         if (storedSettings) setSettings(JSON.parse(storedSettings));
       } catch (e) {
         console.error('LocalStorage load error:', e);
@@ -553,6 +587,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       newExpiryDate?: string;
       newIssueDate?: string;
       newAmount?: number;
+      amountReceived?: number;
+      balanceAmount?: number;
+      paymentStatus?: 'SETTLED' | 'BALANCE_DUE' | 'REFUND_DUE';
       newDocumentNumber?: string;
       notes?: string;
       fileName?: string;
@@ -584,6 +621,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         issueDate: newDetails.newIssueDate || new Date().toISOString().split('T')[0],
         expiryDate: newDetails.newExpiryDate,
         amount: newDetails.newAmount ?? oldDoc.amount,
+        amountReceived: newDetails.amountReceived,
+        balanceAmount: newDetails.balanceAmount,
+        paymentStatus: newDetails.paymentStatus,
         notes: newDetails.notes || `Renewed. Previous cycle archived to history.`,
         fileName: newDetails.fileName || oldDoc.fileName,
         fileUrl: newDetails.fileUrl || oldDoc.fileUrl,
@@ -601,8 +641,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return updated;
       });
 
+      // Update vehicle financial status if vehicleId present
+      if (oldDoc.vehicleId) {
+        setVehicles((prev) => {
+          const updated = prev.map((v) => {
+            if (v.id === oldDoc.vehicleId) {
+              return {
+                ...v,
+                totalCost: newDetails.newAmount ?? v.totalCost,
+                amountReceived: newDetails.amountReceived ?? v.amountReceived,
+                balanceAmount: newDetails.balanceAmount ?? v.balanceAmount,
+                paymentStatus: newDetails.paymentStatus ?? v.paymentStatus,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return v;
+          });
+          saveState('vehicles', updated);
+          return updated;
+        });
+      }
+
+      // Update task with financial details
       if (taskIdToComplete) {
-        completeTask(taskIdToComplete, `Renewal completed with new expiry: ${newDetails.newExpiryDate}`);
+        setTasks((prev) => {
+          const updated = prev.map((t) => {
+            if (t.id === taskIdToComplete) {
+              return {
+                ...t,
+                status: 'COMPLETED' as const,
+                completedAt: new Date().toISOString(),
+                completedBy: userId,
+                completionNotes: newDetails.notes || `Renewal completed with new expiry: ${newDetails.newExpiryDate}`,
+                estimatedCost: newDetails.newAmount,
+                amountReceived: newDetails.amountReceived,
+                balanceAmount: newDetails.balanceAmount,
+                paymentStatus: newDetails.paymentStatus,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return t;
+          });
+          saveState('tasks', updated);
+          return updated;
+        });
       }
 
       return newDocId;
@@ -826,6 +908,139 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: calculateRenewalStatus(doc.expiryDate, doc.reminderDays, doc.isHistorical),
     }));
   }, [documents]);
+
+  // Automated Compliance Expiry & Multi-Task Generator
+  useEffect(() => {
+    if (isLoading || documents.length === 0 || vehicles.length === 0) return;
+
+    const dueDocs = evaluatedDocuments.filter(
+      (d) =>
+        !d.isHistorical &&
+        d.expiryDate &&
+        (d.status === 'DUE_SOON' || d.status === 'DUE_TODAY' || d.status === 'OVERDUE')
+    );
+
+    if (dueDocs.length === 0) return;
+
+    const newTasksToAdd: Task[] = [];
+    const newNotifsToAdd: Notification[] = [];
+    const newLogsToAdd: ActivityLog[] = [];
+
+    dueDocs.forEach((doc) => {
+      const veh = vehicles.find((v) => v.id === doc.vehicleId);
+      if (!veh || veh.status === 'INACTIVE') return;
+
+      const client = clients.find((c) => c.id === doc.clientId);
+      const targetAgentId = veh.assignedAgentId || users.find((u) => u.role === 'AGENT')?.id || 'agent';
+      const agent = users.find((u) => u.id === targetAgentId);
+
+      // Check if an active task exists for this vehicle's specific document
+      const alreadyHasTask = tasks.concat(newTasksToAdd).some(
+        (t) =>
+          t.documentId === doc.id &&
+          t.status !== 'COMPLETED' &&
+          t.status !== 'CANCELLED'
+      );
+
+      if (!alreadyHasTask) {
+        const taskId = `task_auto_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const docLabel =
+          doc.documentType === 'INSURANCE'
+            ? 'Motor Insurance'
+            : doc.documentType === 'FITNESS'
+            ? 'Fitness Certificate'
+            : doc.documentType === 'PUC'
+            ? 'Pollution Certificate (PUC)'
+            : doc.documentType;
+
+        const priority = doc.status === 'OVERDUE' ? 'HIGH' : doc.status === 'DUE_TODAY' ? 'HIGH' : 'NORMAL';
+
+        const newTask: Task = {
+          id: taskId,
+          clientId: doc.clientId,
+          vehicleId: doc.vehicleId,
+          documentId: doc.id,
+          title: `${veh.registrationNumber} - ${docLabel} Renewal`,
+          description: `Compliance follow-up: ${docLabel} is ${doc.status === 'OVERDUE' ? 'OVERDUE' : 'due on ' + doc.expiryDate}. Please contact ${client?.name || 'Client'} (${client?.mobile || 'No contact phone'}) to arrange renewal quotation and collection.`,
+          assignedTo: targetAgentId,
+          dueDate: doc.expiryDate || new Date().toISOString().split('T')[0],
+          priority,
+          status: 'PENDING',
+          notes: `System generated compliance alert (${doc.status})`,
+          createdBy: 'system',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        newTasksToAdd.push(newTask);
+
+        // In-App Notification for Assigned Agent
+        newNotifsToAdd.push({
+          id: `notif_${Date.now()}_agent_${newNotifsToAdd.length}`,
+          userId: targetAgentId,
+          title: `Renewal Assigned: ${veh.registrationNumber}`,
+          message: `${docLabel} is ${doc.status} (Expires: ${doc.expiryDate}). Immediate follow-up required.`,
+          type: 'TASK_ASSIGNED',
+          relatedVehicleId: veh.id,
+          relatedTaskId: taskId,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        });
+
+        // In-App Notification for Admin
+        const adminUser = users.find((u) => u.role === 'ADMIN');
+        if (adminUser && adminUser.id !== targetAgentId) {
+          newNotifsToAdd.push({
+            id: `notif_${Date.now()}_admin_${newNotifsToAdd.length}`,
+            userId: adminUser.id,
+            title: `Compliance Due: ${veh.registrationNumber}`,
+            message: `${docLabel} is ${doc.status}. Assigned to ${agent?.name || 'Agent'}.`,
+            type: doc.status === 'OVERDUE' ? 'OVERDUE' : 'RENEWAL_DUE',
+            relatedVehicleId: veh.id,
+            relatedTaskId: taskId,
+            isRead: false,
+            createdAt: new Date().toISOString(),
+          });
+        }
+
+        // Email Alert Simulation Log
+        newLogsToAdd.push({
+          id: `log_email_${Date.now()}_${newLogsToAdd.length}`,
+          userId: 'system',
+          userName: 'Alert Engine',
+          action: 'EMAIL_DISPATCHED',
+          entityType: 'DOCUMENT',
+          entityId: doc.id,
+          description: `Dispatched renewal alert emails to Admin (${adminUser?.email || 'admin@apexmotors.com'}), Agent (${agent?.email || 'agent@apexmotors.com'}), and Client (${client?.email || client?.mobile}) for ${veh.registrationNumber} ${docLabel}.`,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    });
+
+    if (newTasksToAdd.length > 0) {
+      setTasks((prev) => {
+        const updated = [...newTasksToAdd, ...prev];
+        saveState('tasks', updated);
+        return updated;
+      });
+
+      if (newNotifsToAdd.length > 0) {
+        setNotifications((prev) => {
+          const updated = [...newNotifsToAdd, ...prev];
+          saveState('notifications', updated);
+          return updated;
+        });
+      }
+
+      if (newLogsToAdd.length > 0) {
+        setActivityLogs((prev) => {
+          const updated = [...newLogsToAdd, ...prev];
+          saveState('activityLogs', updated);
+          return updated;
+        });
+      }
+    }
+  }, [evaluatedDocuments, vehicles, clients, users, isLoading]);
 
   // ROLE-BASED FILTERED VIEWS (Sections 7, 8, 9, 37, 38)
   const isAgent = currentUser?.role === 'AGENT';

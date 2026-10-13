@@ -59,19 +59,11 @@ export function Sidebar({
       adminOnly: false,
     },
     {
-      label: 'Renewals',
-      href: '/renewals',
-      icon: RotateCcw,
-      badge: overdueCount > 0 ? `${overdueCount}` : undefined,
-      badgeVariant: 'danger' as const,
-      adminOnly: false,
-    },
-    {
       label: 'Tasks',
       href: '/tasks',
       icon: CheckSquare,
-      badge: pendingTaskCount > 0 ? `${pendingTaskCount}` : undefined,
-      badgeVariant: 'info' as const,
+      badge: pendingTaskCount > 0 ? `${pendingTaskCount}` : (overdueCount > 0 ? `${overdueCount}` : undefined),
+      badgeVariant: overdueCount > 0 ? ('danger' as const) : ('info' as const),
       adminOnly: false,
     },
     {

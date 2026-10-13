@@ -122,25 +122,30 @@ The system is built on a reactive state store (`lib/store/app-context.tsx`) that
    * Clicking **"Apply Verified Details to Form →"** transfers only the verified values into the form fields.
 5. **Duplicate Prevention**:
    * Strips spaces and hyphens (`KL10AZ4589`) to verify uniqueness against existing active vehicles before saving.
+6. **Vahan / CarInfo 1-Click Auto-Lookup Engine (`lib/vahan/lookup.ts`)**:
+   * Instant Parivahan registry retrieval for any Indian registration number.
+   * Auto-populates vehicle make, model, category, fuel type, VIN chassis number, engine number, RTO location, and **all 3 core compliance dates** (Insurance, Fitness, PUC).
+   * Streamlined vehicle modal: eliminates field overload for agents while keeping advanced specs in a collapsible accordion.
 
 ---
 
 ## 5. Module 4: RTO Renewal & Expiry Tracking Engine
 
 ### Key Files
+* `lib/vahan/lookup.ts`: Parivahan / CarInfo auto-fetch gateway.
 * `lib/renewals/engine.ts`: Expiry date calculation, renewal status progression, and days-remaining algorithms.
 * `app/renewals/page.tsx`: Dedicated renewal operations center with filter tabs.
-* `components/shared/completion-modal.tsx`: Modal for recording renewal completion and next-cycle scheduling.
-* `components/shared/renewal-request-modal.tsx`: Modal for creating ad-hoc renewal requests.
+* `components/shared/completion-modal.tsx`: Modal prompting "Renewed until when?" (next cycle expiry, policy number, amount, document).
+* `lib/store/app-context.tsx`: Automated multi-task generation and email alert dispatcher.
 
-### Supported Document Types
+### Core 3 Compliances & Standard Validity
 | Document Type | Code | Standard Validity | Description |
 | :--- | :--- | :--- | :--- |
 | **Insurance** | `INSURANCE` | 1 Year / 3 Years | Comprehensive or Third-Party motor insurance policy. |
+| **Fitness Certificate** | `FITNESS` | 1 Year / 2 Years | Mandatory roadworthiness inspection for commercial vehicles. |
+| **Pollution (PUC)** | `PUC` | 6 Months / 1 Year | Emission compliance certificate ("Poka"). |
 | **Road Tax** | `ROAD_TAX` | Quarterly / 1 Year / 5 Years | State motor vehicle tax payable to the RTO. |
 | **Green Tax** | `GREEN_TAX` | 5 Years | Environmental cess for transport vehicles over 15 years old. |
-| **Pollution (PUC)** | `PUC` | 6 Months / 1 Year | Emission compliance certificate. |
-| **Fitness Certificate** | `FITNESS` | 1 Year / 2 Years | Mandatory roadworthiness inspection for commercial vehicles. |
 | **Transport Permit** | `PERMIT` | 5 Years | Goods or passenger carriage permits. |
 
 ### Expiry Progression Logic

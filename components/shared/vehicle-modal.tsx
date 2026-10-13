@@ -6,14 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { useApp } from '@/lib/store/app-context';
 import { FuelType, Vehicle, VehicleType } from '@/lib/types';
-import { normalizeRegistrationNumber } from '@/lib/utils';
+import { normalizeRegistrationNumber, calculatePaymentBalance, formatCurrency } from '@/lib/utils';
 import {
   performRcOcr,
-  SAMPLE_RC_PRESETS,
   ExtractedRcData,
 } from '@/lib/ocr/rc-scanner';
 import {
-  Camera,
   UploadCloud,
   Sparkles,
   CheckCircle2,
@@ -25,6 +23,10 @@ import {
   ArrowRight,
   RefreshCw,
   Zap,
+  FileCheck,
+  Flame,
+  Wallet,
+  UserCheck,
 } from 'lucide-react';
 
 interface VehicleModalProps {
@@ -40,54 +42,65 @@ export function VehicleModal({
   clientId: defaultClientId,
   initialVehicle,
 }: VehicleModalProps) {
-  const { clients, vehicles, users, currentUser, addVehicle, updateVehicle, addClient, updateClient } = useApp();
+  const {
+    clients,
+    vehicles,
+    documents,
+    users,
+    currentUser,
+    addVehicle,
+    updateVehicle,
+    addClient,
+    updateClient,
+    addDocument,
+    updateDocument,
+  } = useApp();
 
   const activeAgents = users.filter((u) => u.status === 'ACTIVE');
 
   // Active Tab: 'FORM' or 'SCAN'
   const [activeTab, setActiveTab] = useState<'FORM' | 'SCAN'>('FORM');
 
-  // Client section state
+  // Client section state (Essential Only: Mobile, Name, Email)
   const [clientMode, setClientMode] = useState<'AUTO_LOOKUP' | 'SELECT_EXISTING'>('AUTO_LOOKUP');
   const [selectedExistingClientId, setSelectedExistingClientId] = useState(defaultClientId || '');
   const [clientMobile, setClientMobile] = useState('');
   const [clientName, setClientName] = useState('');
-  const [relationshipName, setRelationshipName] = useState('');
-  const [clientAddress, setClientAddress] = useState('');
-  const [pincode, setPincode] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [matchedExistingClient, setMatchedExistingClient] = useState<any>(null);
 
-  // Vehicle form fields - ALL DEFAULT TO EMPTY TO PREVENT HALLUCINATIONS / FALSE DEFAULTS
+  // Point of Contact (POC) / Field Person
+  const [pocName, setPocName] = useState('');
+  const [pocMobile, setPocMobile] = useState('');
+  const [pocDesignation, setPocDesignation] = useState('Driver');
+  const [hasSeparatePoc, setHasSeparatePoc] = useState(false);
+
+  // Financial Ledger & Advance Payment
+  const [totalCost, setTotalCost] = useState('');
+  const [amountReceived, setAmountReceived] = useState('');
+
+  // Vehicle essentials
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [vehicleType, setVehicleType] = useState<VehicleType>('PRIVATE_CAR');
-  const [vehicleClass, setVehicleClass] = useState('');
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
-  const [variant, setVariant] = useState('');
   const [fuelType, setFuelType] = useState<FuelType>('PETROL');
-  const [manufacturingYear, setManufacturingYear] = useState<number | ''>('');
-  const [manufacturingMonthYear, setManufacturingMonthYear] = useState('');
-  const [registrationDate, setRegistrationDate] = useState('');
   const [chassisNumber, setChassisNumber] = useState('');
   const [engineNumber, setEngineNumber] = useState('');
   const [rto, setRto] = useState('');
-  const [registrationValidity, setRegistrationValidity] = useState('');
   const [assignedAgentId, setAssignedAgentId] = useState('');
   const [notes, setNotes] = useState('');
 
-  // RC Smart Card Detailed Specifications (Kerala & Indian Standard)
-  const [color, setColor] = useState('');
-  const [bodyType, setBodyType] = useState('');
-  const [seatingCapacity, setSeatingCapacity] = useState<number | ''>('');
-  const [unladenWeight, setUnladenWeight] = useState<number | ''>('');
-  const [cubicCapacity, setCubicCapacity] = useState<number | ''>('');
-  const [horsepower, setHorsepower] = useState('');
-  const [wheelbase, setWheelbase] = useState<number | ''>('');
-  const [cylinders, setCylinders] = useState<number | ''>('');
-  const [ownerSerial, setOwnerSerial] = useState<number | ''>('');
-  const [financier, setFinancier] = useState('');
-  const [emissionNorms, setEmissionNorms] = useState('');
+  // Core 3 Compliances (Essential for Consultancy Operations)
+  const [insuranceExpiryDate, setInsuranceExpiryDate] = useState('');
+  const [insurancePolicyNumber, setInsurancePolicyNumber] = useState('');
+  const [insuranceProvider, setInsuranceProvider] = useState('');
+
+  const [fitnessExpiryDate, setFitnessExpiryDate] = useState('');
+  const [fitnessNumber, setFitnessNumber] = useState('');
+
+  const [pucExpiryDate, setPucExpiryDate] = useState('');
+  const [pucNumber, setPucNumber] = useState('');
 
   const [errorMsg, setErrorMsg] = useState('');
   const [successNotice, setSuccessNotice] = useState('');
@@ -118,42 +131,52 @@ export function VehicleModal({
         setSelectedExistingClientId(existingClient.id);
         setClientMobile(existingClient.mobile);
         setClientName(existingClient.name);
-        setRelationshipName(existingClient.relationshipName || '');
-        setClientAddress(existingClient.address);
-        setPincode(existingClient.pincode || '');
         setClientEmail(existingClient.email || '');
       }
 
       setRegistrationNumber(initialVehicle.registrationNumber);
       setVehicleType(initialVehicle.vehicleType);
-      setVehicleClass(initialVehicle.vehicleClass || '');
       setMake(initialVehicle.make);
       setModel(initialVehicle.model);
-      setVariant(initialVehicle.variant || '');
       setFuelType(initialVehicle.fuelType);
-      setManufacturingYear(initialVehicle.manufacturingYear ?? '');
-      setManufacturingMonthYear(initialVehicle.manufacturingMonthYear || '');
-      setRegistrationDate(initialVehicle.registrationDate || '');
       setChassisNumber(initialVehicle.chassisNumber || '');
       setEngineNumber(initialVehicle.engineNumber || '');
       setRto(initialVehicle.rto || '');
-      setRegistrationValidity(initialVehicle.registrationValidity || '');
       setAssignedAgentId(initialVehicle.assignedAgentId);
       setNotes(initialVehicle.notes || '');
 
-      setColor(initialVehicle.color || '');
-      setBodyType(initialVehicle.bodyType || '');
-      setSeatingCapacity(initialVehicle.seatingCapacity ?? '');
-      setUnladenWeight(initialVehicle.unladenWeight ?? '');
-      setCubicCapacity(initialVehicle.cubicCapacity ?? '');
-      setHorsepower(initialVehicle.horsepower || '');
-      setWheelbase(initialVehicle.wheelbase ?? '');
-      setCylinders(initialVehicle.cylinders ?? '');
-      setOwnerSerial(initialVehicle.ownerSerial ?? '');
-      setFinancier(initialVehicle.financier || '');
-      setEmissionNorms(initialVehicle.emissionNorms || '');
+      // Load POC details
+      setPocName(initialVehicle.pocName || '');
+      setPocMobile(initialVehicle.pocMobile || '');
+      setPocDesignation(initialVehicle.pocDesignation || 'Driver');
+      setHasSeparatePoc(Boolean(initialVehicle.pocName || initialVehicle.pocMobile));
+
+      // Load Financial status
+      setTotalCost(initialVehicle.totalCost ? String(initialVehicle.totalCost) : '');
+      setAmountReceived(initialVehicle.amountReceived ? String(initialVehicle.amountReceived) : '');
+
+      // Load existing active documents
+      const activeDocs = documents.filter((d) => d.vehicleId === initialVehicle.id && !d.isHistorical);
+      const insDoc = activeDocs.find((d) => d.documentType === 'INSURANCE');
+      if (insDoc) {
+        setInsuranceExpiryDate(insDoc.expiryDate || '');
+        setInsurancePolicyNumber(insDoc.documentNumber || '');
+        setInsuranceProvider(insDoc.insuranceProvider || '');
+      }
+
+      const fitDoc = activeDocs.find((d) => d.documentType === 'FITNESS');
+      if (fitDoc) {
+        setFitnessExpiryDate(fitDoc.expiryDate || '');
+        setFitnessNumber(fitDoc.documentNumber || '');
+      }
+
+      const pucDoc = activeDocs.find((d) => d.documentType === 'PUC');
+      if (pucDoc) {
+        setPucExpiryDate(pucDoc.expiryDate || '');
+        setPucNumber(pucDoc.documentNumber || '');
+      }
     } else {
-      // Creating vehicle - clean slate with ZERO dummy defaults
+      // Clean slate for new vehicle
       if (defaultClientId) {
         const client = clients.find((c) => c.id === defaultClientId);
         if (client) {
@@ -161,9 +184,6 @@ export function VehicleModal({
           setSelectedExistingClientId(client.id);
           setClientMobile(client.mobile);
           setClientName(client.name);
-          setRelationshipName(client.relationshipName || '');
-          setClientAddress(client.address);
-          setPincode(client.pincode || '');
           setClientEmail(client.email || '');
         }
       } else {
@@ -171,26 +191,17 @@ export function VehicleModal({
         setSelectedExistingClientId('');
         setClientMobile('');
         setClientName('');
-        setRelationshipName('');
-        setClientAddress('');
-        setPincode('');
         setClientEmail('');
       }
 
       setRegistrationNumber('');
       setVehicleType('PRIVATE_CAR');
-      setVehicleClass('');
       setMake('');
       setModel('');
-      setVariant('');
       setFuelType('PETROL');
-      setManufacturingYear('');
-      setManufacturingMonthYear('');
-      setRegistrationDate('');
       setChassisNumber('');
       setEngineNumber('');
       setRto('');
-      setRegistrationValidity('');
       setAssignedAgentId(
         currentUser?.role === 'AGENT'
           ? currentUser.id
@@ -198,24 +209,26 @@ export function VehicleModal({
       );
       setNotes('');
 
-      setColor('');
-      setBodyType('');
-      setSeatingCapacity('');
-      setUnladenWeight('');
-      setCubicCapacity('');
-      setHorsepower('');
-      setWheelbase('');
-      setCylinders('');
-      setOwnerSerial('');
-      setFinancier('');
-      setEmissionNorms('');
-    }
-  }, [initialVehicle, defaultClientId, isOpen, clients, currentUser]);
+      // Reset POC & Financial fields
+      setPocName('');
+      setPocMobile('');
+      setPocDesignation('Driver');
+      setHasSeparatePoc(false);
+      setTotalCost('');
+      setAmountReceived('');
 
-  // Clean phone number for comparison
+      setInsuranceExpiryDate('');
+      setInsurancePolicyNumber('');
+      setInsuranceProvider('');
+      setFitnessExpiryDate('');
+      setFitnessNumber('');
+      setPucExpiryDate('');
+      setPucNumber('');
+    }
+  }, [initialVehicle, defaultClientId, isOpen, clients, documents, currentUser]);
+
   const cleanPhone = (phone: string) => phone.replace(/[^0-9]/g, '').slice(-10);
 
-  // Phone number lookup effect
   const handlePhoneChange = (val: string) => {
     setClientMobile(val);
     const cleaned = cleanPhone(val);
@@ -225,9 +238,6 @@ export function VehicleModal({
       if (match) {
         setMatchedExistingClient(match);
         setClientName(match.name);
-        if (match.relationshipName) setRelationshipName(match.relationshipName);
-        setClientAddress(match.address);
-        if (match.pincode) setPincode(match.pincode);
         if (match.email) setClientEmail(match.email);
       } else {
         setMatchedExistingClient(null);
@@ -236,6 +246,7 @@ export function VehicleModal({
       setMatchedExistingClient(null);
     }
   };
+
 
   // OCR execution handler
   const handleImageUpload = async (file: File) => {
@@ -258,63 +269,31 @@ export function VehicleModal({
       setExtractedData(result.data);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err?.message || 'Failed to scan image. You can try a preset or enter details manually.');
+      setErrorMsg(err?.message || 'Failed to parse RC. Please check image clarity.');
     } finally {
       setIsScanning(false);
     }
   };
 
-  // Apply a sample preset for demo/instant testing
-  const handleSelectPreset = (presetData: ExtractedRcData) => {
-    setExtractedData(presetData);
-    setScanPreviewUrl(null);
-  };
 
-  // Populate form with strictly detected RC values
+
   const applyExtractedDataToForm = (data: ExtractedRcData) => {
+    if (!data) return;
+
     if (data.registrationNumber) setRegistrationNumber(data.registrationNumber);
     if (data.make) setMake(data.make);
     if (data.model) setModel(data.model);
-    if (data.variant) setVariant(data.variant);
     if (data.vehicleType) setVehicleType(data.vehicleType);
-    if (data.vehicleClass) setVehicleClass(data.vehicleClass);
     if (data.fuelType) setFuelType(data.fuelType);
-    if (data.manufacturingYear) setManufacturingYear(data.manufacturingYear);
-    if (data.manufacturingMonthYear) setManufacturingMonthYear(data.manufacturingMonthYear);
-    if (data.registrationDate) setRegistrationDate(data.registrationDate);
     if (data.chassisNumber) setChassisNumber(data.chassisNumber);
     if (data.engineNumber) setEngineNumber(data.engineNumber);
     if (data.rto) setRto(data.rto);
-    if (data.registrationValidity) setRegistrationValidity(data.registrationValidity);
+    if (data.registrationValidity) setFitnessExpiryDate(data.registrationValidity);
+    if (data.insuranceValidity) setInsuranceExpiryDate(data.insuranceValidity);
+    if (data.pollutionValidity) setPucExpiryDate(data.pollutionValidity);
+    if (data.ownerName) setClientName(data.ownerName);
 
-    // Detailed RC Specifications
-    if (data.color) setColor(data.color);
-    if (data.bodyType) setBodyType(data.bodyType);
-    if (data.seatingCapacity !== undefined && data.seatingCapacity !== null) setSeatingCapacity(data.seatingCapacity);
-    if (data.unladenWeight !== undefined && data.unladenWeight !== null) setUnladenWeight(data.unladenWeight);
-    if (data.cubicCapacity !== undefined && data.cubicCapacity !== null) setCubicCapacity(data.cubicCapacity);
-    if (data.horsepower) setHorsepower(data.horsepower);
-    if (data.wheelbase !== undefined && data.wheelbase !== null) setWheelbase(data.wheelbase);
-    if (data.cylinders !== undefined && data.cylinders !== null) setCylinders(data.cylinders);
-    if (data.ownerSerial !== undefined && data.ownerSerial !== null) setOwnerSerial(data.ownerSerial);
-    if (data.financier) setFinancier(data.financier);
-    if (data.emissionNorms) setEmissionNorms(data.emissionNorms);
-
-    // Client & Owner details from RC
-    if (data.ownerName && !clientName) {
-      setClientName(data.ownerName);
-    }
-    if (data.relationshipName) {
-      setRelationshipName(data.relationshipName);
-    }
-    if (data.ownerAddress && !clientAddress) {
-      setClientAddress(data.ownerAddress);
-    }
-    if (data.pincode && !pincode) {
-      setPincode(data.pincode);
-    }
-
-    setSuccessNotice(`Verified RC details applied successfully! (${data.detectedFieldCount || 0} fields extracted)`);
+    setSuccessNotice(`Verified RC details applied successfully!`);
     setActiveTab('FORM');
   };
 
@@ -340,7 +319,7 @@ export function VehicleModal({
     }
 
     if (!rto.trim()) {
-      setErrorMsg('Please enter RTO office location (e.g. Kottarakkara SRTO).');
+      setErrorMsg('Please enter RTO office location (e.g. Perinthalmanna SRTO).');
       return;
     }
 
@@ -353,7 +332,9 @@ export function VehicleModal({
     );
 
     if (duplicate) {
-      setErrorMsg(`Vehicle with registration number ${registrationNumber} is already registered in the system!`);
+      const dupClient = clients.find((c) => c.id === duplicate.clientId);
+      const clientStr = dupClient ? ` for client "${dupClient.name}" (${dupClient.mobile})` : '';
+      setErrorMsg(`Vehicle with registration number ${registrationNumber.toUpperCase()} is already registered in the system${clientStr}! You cannot add duplicate active vehicles.`);
       return;
     }
 
@@ -366,7 +347,6 @@ export function VehicleModal({
       if (clientMode === 'SELECT_EXISTING' && selectedExistingClientId) {
         finalClientId = selectedExistingClientId;
       } else {
-        // Auto-lookup / Inline client mode
         if (!clientMobile.trim() || clientMobile.trim().length < 6) {
           setErrorMsg('Please provide a valid client mobile number.');
           setIsSubmitting(false);
@@ -381,34 +361,20 @@ export function VehicleModal({
 
         if (matchedExistingClient) {
           finalClientId = matchedExistingClient.id;
-          const clientUpdates: any = {};
-          if (clientAddress && clientAddress !== matchedExistingClient.address) {
-            clientUpdates.address = clientAddress.trim();
-          }
-          if (relationshipName && relationshipName !== matchedExistingClient.relationshipName) {
-            clientUpdates.relationshipName = relationshipName.trim();
-          }
-          if (pincode && pincode !== matchedExistingClient.pincode) {
-            clientUpdates.pincode = pincode.trim();
-          }
-          if (Object.keys(clientUpdates).length > 0) {
-            await updateClient(matchedExistingClient.id, clientUpdates);
+          if (clientEmail && clientEmail !== matchedExistingClient.email) {
+            await updateClient(matchedExistingClient.id, { email: clientEmail.trim() });
           }
         } else {
-          // Check if client with this phone number already exists
           const cleaned = cleanPhone(clientMobile);
           const found = clients.find((c) => cleanPhone(c.mobile) === cleaned);
 
           if (found) {
             finalClientId = found.id;
           } else {
-            // Automatically register brand-new client in database!
             const newClientId = await addClient({
               name: clientName.trim(),
               mobile: clientMobile.trim(),
-              address: clientAddress.trim() || 'Address not specified',
-              relationshipName: relationshipName.trim() || undefined,
-              pincode: pincode.trim() || undefined,
+              address: 'Address not specified',
               email: clientEmail.trim() || undefined,
               assignedAgentId: assignedAgentId || currentUser?.id || 'agent',
               status: 'ACTIVE',
@@ -425,42 +391,111 @@ export function VehicleModal({
         return;
       }
 
+      const balanceSummary = calculatePaymentBalance(
+        totalCost ? Number(totalCost) : 0,
+        amountReceived ? Number(amountReceived) : 0
+      );
+
       const vehiclePayload = {
         clientId: finalClientId,
         registrationNumber: registrationNumber.toUpperCase().trim(),
         vehicleType,
-        vehicleClass: vehicleClass || undefined,
         make: make.trim(),
         model: model.trim(),
-        variant: variant.trim() || undefined,
         fuelType,
-        manufacturingYear: manufacturingYear !== '' ? Number(manufacturingYear) : undefined,
-        manufacturingMonthYear: manufacturingMonthYear.trim() || undefined,
-        registrationDate: registrationDate || undefined,
         chassisNumber: chassisNumber.trim() || undefined,
         engineNumber: engineNumber.trim() || undefined,
         rto: rto.trim(),
-        registrationValidity: registrationValidity || undefined,
-        color: color.trim() || undefined,
-        bodyType: bodyType.trim() || undefined,
-        seatingCapacity: seatingCapacity !== '' ? Number(seatingCapacity) : undefined,
-        unladenWeight: unladenWeight !== '' ? Number(unladenWeight) : undefined,
-        cubicCapacity: cubicCapacity !== '' ? Number(cubicCapacity) : undefined,
-        horsepower: horsepower.trim() || undefined,
-        wheelbase: wheelbase !== '' ? Number(wheelbase) : undefined,
-        cylinders: cylinders !== '' ? Number(cylinders) : undefined,
-        ownerSerial: ownerSerial !== '' ? Number(ownerSerial) : undefined,
-        financier: financier.trim() || undefined,
-        emissionNorms: emissionNorms.trim() || undefined,
-        assignedAgentId,
+        registrationValidity: fitnessExpiryDate || undefined,
+        assignedAgentId: assignedAgentId || currentUser?.id || 'agent',
         status: 'ACTIVE' as const,
         notes: notes.trim() || undefined,
+        // Point of Contact (POC) details
+        pocName: hasSeparatePoc && pocName.trim() ? pocName.trim() : undefined,
+        pocMobile: hasSeparatePoc && pocMobile.trim() ? pocMobile.trim() : undefined,
+        pocDesignation: hasSeparatePoc && pocName.trim() ? pocDesignation : undefined,
+        // Financial Ledger & Billing Status
+        totalCost: totalCost ? Number(totalCost) : undefined,
+        amountReceived: amountReceived ? Number(amountReceived) : undefined,
+        balanceAmount: (totalCost || amountReceived) ? balanceSummary.balanceAmount : undefined,
+        paymentStatus: (totalCost || amountReceived) ? balanceSummary.paymentStatus : undefined,
       };
 
+      let vehicleId = initialVehicle?.id;
       if (initialVehicle) {
         await updateVehicle(initialVehicle.id, vehiclePayload);
       } else {
-        await addVehicle(vehiclePayload);
+        vehicleId = await addVehicle(vehiclePayload);
+      }
+
+      // Automatically Create / Sync the Core 3 Compliance Documents
+      if (vehicleId) {
+        const activeDocs = documents.filter((d) => d.vehicleId === vehicleId && !d.isHistorical);
+
+        // 1. Insurance Document
+        if (insuranceExpiryDate) {
+          const existingIns = activeDocs.find((d) => d.documentType === 'INSURANCE');
+          if (existingIns) {
+            await updateDocument(existingIns.id, {
+              expiryDate: insuranceExpiryDate,
+              documentNumber: insurancePolicyNumber || existingIns.documentNumber,
+              insuranceProvider: insuranceProvider || existingIns.insuranceProvider,
+            });
+          } else {
+            await addDocument({
+              vehicleId,
+              clientId: finalClientId,
+              documentType: 'INSURANCE',
+              expiryDate: insuranceExpiryDate,
+              documentNumber: insurancePolicyNumber || undefined,
+              insuranceProvider: insuranceProvider || undefined,
+              reminderDays: 30,
+              notes: 'Recorded during vehicle registration',
+            });
+          }
+        }
+
+        // 2. Fitness Document
+        if (fitnessExpiryDate) {
+          const existingFit = activeDocs.find((d) => d.documentType === 'FITNESS');
+          if (existingFit) {
+            await updateDocument(existingFit.id, {
+              expiryDate: fitnessExpiryDate,
+              documentNumber: fitnessNumber || existingFit.documentNumber,
+            });
+          } else {
+            await addDocument({
+              vehicleId,
+              clientId: finalClientId,
+              documentType: 'FITNESS',
+              expiryDate: fitnessExpiryDate,
+              documentNumber: fitnessNumber || undefined,
+              reminderDays: 30,
+              notes: 'Fitness certificate recorded during registration',
+            });
+          }
+        }
+
+        // 3. Pollution Certificate (PUC / Poka)
+        if (pucExpiryDate) {
+          const existingPuc = activeDocs.find((d) => d.documentType === 'PUC');
+          if (existingPuc) {
+            await updateDocument(existingPuc.id, {
+              expiryDate: pucExpiryDate,
+              documentNumber: pucNumber || existingPuc.documentNumber,
+            });
+          } else {
+            await addDocument({
+              vehicleId,
+              clientId: finalClientId,
+              documentType: 'PUC',
+              expiryDate: pucExpiryDate,
+              documentNumber: pucNumber || undefined,
+              reminderDays: 15,
+              notes: 'Emission compliance (PUC) recorded during registration',
+            });
+          }
+        }
       }
 
       onClose();
@@ -476,12 +511,12 @@ export function VehicleModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={initialVehicle ? 'Edit Vehicle Details' : 'Register Vehicle & Client'}
-      description="Record vehicle specifications, technical identifiers, and owner linkage with Smart RC Scanner."
-      maxWidth="2xl"
+      title={initialVehicle ? 'Edit Vehicle Details' : 'Add Vehicle'}
+      description="Permanent RC vehicle details, owner contact, and periodic compliances (Insurance, PUC) management."
+      maxWidth="5xl"
     >
       <div className="space-y-4">
-        {/* Navigation Tabs (Manual Form vs Scan RC) */}
+        {/* Navigation Tabs */}
         {!initialVehicle && (
           <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl">
             <button
@@ -494,7 +529,7 @@ export function VehicleModal({
               }`}
             >
               <FileText className="w-4 h-4" />
-              <span>Vehicle Form</span>
+              <span>Add Vehicle Form</span>
             </button>
             <button
               type="button"
@@ -532,17 +567,6 @@ export function VehicleModal({
         {/* TAB 1: SMART RC SCANNER */}
         {activeTab === 'SCAN' && (
           <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50/70 via-indigo-50/40 to-slate-50 border border-blue-200/80">
-              <div className="flex items-center gap-2 text-blue-900 font-bold text-sm">
-                <Sparkles className="w-4 h-4 text-blue-600" />
-                <span>Instant RC Auto-Extraction</span>
-              </div>
-              <p className="text-xs text-slate-600 mt-1">
-                Upload or capture a photo of the vehicle RC smart card. Verified details will be extracted with strict accuracy without false guesses.
-              </p>
-            </div>
-
-            {/* Hidden File Input */}
             <input
               type="file"
               ref={fileInputRef}
@@ -554,7 +578,6 @@ export function VehicleModal({
               }}
             />
 
-            {/* Drop / Capture Zone */}
             <div
               onClick={() => !isScanning && fileInputRef.current?.click()}
               className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer overflow-hidden ${
@@ -563,7 +586,6 @@ export function VehicleModal({
                   : 'border-slate-300 hover:border-blue-500 hover:bg-slate-50/80'
               }`}
             >
-              {/* Laser Beam Animation during OCR */}
               {isScanning && (
                 <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent shadow-[0_0_15px_#3b82f6] animate-scan-beam pointer-events-none z-20" />
               )}
@@ -599,213 +621,60 @@ export function VehicleModal({
                   <div className="w-12 h-12 rounded-2xl bg-blue-100/80 text-blue-600 flex items-center justify-center shadow-inner">
                     <UploadCloud className="w-6 h-6" />
                   </div>
-                  <div className="text-sm font-bold text-slate-800">
-                    Click to Upload RC Image or Snap Photo
+                  <div className="text-xs font-bold text-slate-800">
+                    {isScanning ? scanStatusText : 'Click to Upload RC Photo or Smart Card'}
                   </div>
-                  <p className="text-xs text-slate-500 max-w-sm">
-                    Supports PNG, JPG, WEBP photos of Indian RC smart cards, paper books, or mParivahan digital cards
+                  <p className="text-[11px] text-slate-500 max-w-xs">
+                    Extracts registration number, make, model, chassis, and validity
                   </p>
                 </div>
               )}
 
-              {/* Scan Progress Bar */}
               {isScanning && (
-                <div className="mt-4 max-w-xs mx-auto space-y-2">
-                  <div className="h-2 w-full bg-blue-100 rounded-full overflow-hidden">
+                <div className="mt-4 max-w-xs mx-auto">
+                  <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-blue-600 transition-all duration-300 rounded-full"
+                      className="h-full bg-blue-600 transition-all duration-300"
                       style={{ width: `${scanProgress}%` }}
                     />
                   </div>
-                  <p className="text-xs font-semibold text-blue-700">{scanStatusText}</p>
+                  <div className="text-[10px] text-blue-700 font-bold mt-1 text-center">
+                    {scanStatusText} ({scanProgress}%)
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* VERIFIED EXTRACTED FIELDS PREVIEW (When OCR finishes or preset selected) */}
-            {extractedData && !isScanning && (
-              <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 space-y-3 animate-in fade-in">
-                <div className="flex items-center justify-between pb-2 border-b border-emerald-200/70">
-                  <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs uppercase tracking-wider">
+            {/* Verified Checklist Preview */}
+            {extractedData && (
+              <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/90 space-y-3 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>Verified Document Fields ({extractedData.detectedFieldCount || 0} Found)</span>
-                  </div>
-                  <span className="text-[11px] font-semibold text-emerald-700">
-                    Accuracy: {extractedData.confidenceScore || 90}%
-                  </span>
-                </div>
-
-                {/* Group 1: Registration & Owner */}
-                <div>
-                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
-                    Registration & Owner Details
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                    {extractedData.registrationNumber && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Reg Number</span>
-                        <strong className="text-slate-900 font-mono">{extractedData.registrationNumber}</strong>
-                      </div>
-                    )}
-                    {extractedData.registrationDate && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Reg Date</span>
-                        <strong className="text-slate-900">{extractedData.registrationDate}</strong>
-                      </div>
-                    )}
-                    {extractedData.registrationValidity && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Validity / Fitness</span>
-                        <strong className="text-slate-900">{extractedData.registrationValidity}</strong>
-                      </div>
-                    )}
-                    {extractedData.rto && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">RTO Authority</span>
-                        <strong className="text-slate-900 truncate block">{extractedData.rto}</strong>
-                      </div>
-                    )}
-                    {extractedData.ownerName && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-2">
-                        <span className="text-[10px] text-slate-500 block">Owner Name</span>
-                        <strong className="text-slate-900 truncate block">{extractedData.ownerName}</strong>
-                      </div>
-                    )}
-                    {extractedData.relationshipName && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-2">
-                        <span className="text-[10px] text-slate-500 block">Relationship (S/D/W of)</span>
-                        <strong className="text-slate-900 truncate block">{extractedData.relationshipName}</strong>
-                      </div>
-                    )}
-                    {extractedData.ownerAddress && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-3">
-                        <span className="text-[10px] text-slate-500 block">Full Address</span>
-                        <span className="text-slate-900 text-[11px] block truncate">{extractedData.ownerAddress}</span>
-                      </div>
-                    )}
-                    {extractedData.pincode && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">PIN Code</span>
-                        <strong className="text-slate-900 font-mono">{extractedData.pincode}</strong>
-                      </div>
-                    )}
+                    <span>Verified RC Fields Detected</span>
                   </div>
                 </div>
 
-                {/* Group 2: Vehicle & Technical Specifications */}
-                <div>
-                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
-                    Vehicle Specifications & Technical Identifiers
-                  </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                    {extractedData.make && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Make</span>
-                        <strong className="text-slate-900">{extractedData.make}</strong>
-                      </div>
-                    )}
-                    {extractedData.model && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Model</span>
-                        <strong className="text-slate-900">{extractedData.model}</strong>
-                      </div>
-                    )}
-                    {extractedData.vehicleClass && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Vehicle Class</span>
-                        <strong className="text-slate-900 truncate block">{extractedData.vehicleClass}</strong>
-                      </div>
-                    )}
-                    {extractedData.fuelType && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Fuel Type</span>
-                        <strong className="text-slate-900">{extractedData.fuelType}</strong>
-                      </div>
-                    )}
-                    {extractedData.color && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Color</span>
-                        <strong className="text-slate-900">{extractedData.color}</strong>
-                      </div>
-                    )}
-                    {extractedData.bodyType && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Body Type</span>
-                        <strong className="text-slate-900">{extractedData.bodyType}</strong>
-                      </div>
-                    )}
-                    {extractedData.seatingCapacity !== undefined && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Seating Capacity</span>
-                        <strong className="text-slate-900">{extractedData.seatingCapacity} seats</strong>
-                      </div>
-                    )}
-                    {extractedData.unladenWeight !== undefined && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Unladen Weight</span>
-                        <strong className="text-slate-900">{extractedData.unladenWeight} kg</strong>
-                      </div>
-                    )}
-                    {extractedData.cubicCapacity !== undefined && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Engine Capacity</span>
-                        <strong className="text-slate-900">{extractedData.cubicCapacity} cc</strong>
-                      </div>
-                    )}
-                    {extractedData.horsepower && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Horsepower</span>
-                        <strong className="text-slate-900">{extractedData.horsepower}</strong>
-                      </div>
-                    )}
-                    {extractedData.wheelbase !== undefined && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Wheelbase</span>
-                        <strong className="text-slate-900">{extractedData.wheelbase} mm</strong>
-                      </div>
-                    )}
-                    {extractedData.cylinders !== undefined && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Cylinders</span>
-                        <strong className="text-slate-900">{extractedData.cylinders}</strong>
-                      </div>
-                    )}
-                    {extractedData.chassisNumber && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-2">
-                        <span className="text-[10px] text-slate-500 block">Chassis (VIN)</span>
-                        <strong className="text-slate-900 truncate block font-mono text-[11px]">{extractedData.chassisNumber}</strong>
-                      </div>
-                    )}
-                    {extractedData.engineNumber && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-2">
-                        <span className="text-[10px] text-slate-500 block">Engine Number</span>
-                        <strong className="text-slate-900 truncate block font-mono text-[11px]">{extractedData.engineNumber}</strong>
-                      </div>
-                    )}
-                    {extractedData.manufacturingMonthYear && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-2">
-                        <span className="text-[10px] text-slate-500 block">Mfg Month / Year</span>
-                        <strong className="text-slate-900">{extractedData.manufacturingMonthYear}</strong>
-                      </div>
-                    )}
-                    {extractedData.ownerSerial !== undefined && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Owner Serial</span>
-                        <strong className="text-slate-900">Serial #{extractedData.ownerSerial}</strong>
-                      </div>
-                    )}
-                    {extractedData.emissionNorms && (
-                      <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                        <span className="text-[10px] text-slate-500 block">Emission Norms</span>
-                        <strong className="text-slate-900">{extractedData.emissionNorms}</strong>
-                      </div>
-                    )}
-                  </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {extractedData.registrationNumber && (
+                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                      <span className="text-[10px] text-slate-500 block">Registration</span>
+                      <strong className="text-slate-900 font-mono">{extractedData.registrationNumber}</strong>
+                    </div>
+                  )}
+                  {extractedData.make && (
+                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                      <span className="text-[10px] text-slate-500 block">Make &amp; Model</span>
+                      <strong className="text-slate-900">{extractedData.make} {extractedData.model}</strong>
+                    </div>
+                  )}
+                  {extractedData.chassisNumber && (
+                    <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-2">
+                      <span className="text-[10px] text-slate-500 block">Chassis (VIN)</span>
+                      <strong className="text-slate-900 font-mono text-[11px] truncate block">{extractedData.chassisNumber}</strong>
+                    </div>
+                  )}
                 </div>
-
-                <p className="text-[11px] text-slate-500 pt-1">
-                  * Note: Only detected fields above will be applied. Missing fields remain empty for you to fill if required.
-                </p>
 
                 <div className="pt-2 flex justify-end">
                   <Button
@@ -814,42 +683,14 @@ export function VehicleModal({
                     onClick={() => applyExtractedDataToForm(extractedData)}
                     className="gap-2 shadow-sm"
                   >
-                    <span>Apply Verified Details to Form</span>
+                    <span>Apply to Form</span>
                     <ArrowRight className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
             )}
 
-            {/* Quick Demo Presets */}
-            <div className="space-y-2 pt-2 border-t border-slate-200/80">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5 text-amber-500" />
-                  Or Try Sample RC Card Presets (Instant Demo)
-                </span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {SAMPLE_RC_PRESETS.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleSelectPreset(preset.data)}
-                    className="p-2.5 rounded-xl border border-slate-200/90 bg-white hover:border-blue-500 hover:bg-blue-50/50 text-left transition-all cursor-pointer group"
-                  >
-                    <div className="text-xs font-bold text-slate-900 group-hover:text-blue-600 truncate">
-                      {preset.data.registrationNumber}
-                    </div>
-                    <div className="text-[11px] text-slate-500 truncate mt-0.5">
-                      {preset.data.make} {preset.data.model}
-                    </div>
-                    <div className="text-[10px] text-blue-600 font-medium mt-1">
-                      {preset.data.ownerName}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
+
 
             <div className="flex justify-end pt-2">
               <Button type="button" variant="secondary" onClick={() => setActiveTab('FORM')}>
@@ -859,461 +700,477 @@ export function VehicleModal({
           </div>
         )}
 
-        {/* TAB 2: UNIFIED VEHICLE & CLIENT FORM */}
+        {/* TAB 2: CLEAN STREAMLINED FORM */}
         {activeTab === 'FORM' && (
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* 1. CLIENT / OWNER CARD */}
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
-                    <User className="w-4 h-4" />
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+              {/* ======================================================== */}
+              {/* LEFT COLUMN (7 Cols): PERMANENT VEHICLE & OWNER SPECS    */}
+              {/* ======================================================== */}
+              <div className="lg:col-span-7 space-y-4">
+                {/* 1. VEHICLE ESSENTIALS & VAHAN AUTO-FETCH */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-3.5">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+                        <Car className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          Permanent Vehicle Details
+                        </h3>
+                        <p className="text-[11px] text-slate-500">
+                          Vehicle specifications and permanent RC details
+                        </p>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Registration Number Input */}
                   <div>
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Vehicle Owner / Client Information
-                    </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Enter owner mobile number — automatically checks & links existing clients
+                    <label className="text-xs font-semibold text-slate-700 block pb-1">
+                      Registration Number <span className="text-rose-500">*</span>
+                    </label>
+                    <Input
+                      required
+                      placeholder="e.g. KL-53-W-8978"
+                      value={registrationNumber}
+                      onChange={(e) => setRegistrationNumber(e.target.value.toUpperCase())}
+                      className="font-mono uppercase font-semibold text-sm tracking-wide"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Tip: You can upload/scan the RC card in the <span className="text-blue-600 font-medium">Smart RC Scanner</span> tab above to auto-fill details automatically.
                     </p>
+                  </div>
+
+                  {/* Core Vehicle Specifications Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Select
+                      label="Vehicle Category"
+                      value={vehicleType}
+                      onChange={(e) => setVehicleType(e.target.value as VehicleType)}
+                    >
+                      <option value="TWO_WHEELER">Two Wheeler (Scooter / Bike)</option>
+                      <option value="PRIVATE_CAR">Private Car (LMV)</option>
+                      <option value="COMMERCIAL_TAXI">Commercial Taxi (Cab)</option>
+                      <option value="GOODS_CARRIER">Goods Carrier (LGV / Truck)</option>
+                      <option value="BUS">Bus / Transport</option>
+                      <option value="AUTO_RICKSHAW">Auto Rickshaw</option>
+                      <option value="OTHER">Other Vehicle</option>
+                    </Select>
+
+                    <Select
+                      label="Fuel Type"
+                      value={fuelType}
+                      onChange={(e) => setFuelType(e.target.value as FuelType)}
+                    >
+                      <option value="PETROL">Petrol</option>
+                      <option value="DIESEL">Diesel</option>
+                      <option value="CNG">CNG</option>
+                      <option value="ELECTRIC">Electric (EV)</option>
+                      <option value="HYBRID">Hybrid</option>
+                    </Select>
+
+                    <Input
+                      label="Make (Brand)"
+                      required
+                      placeholder="e.g. SUZUKI"
+                      value={make}
+                      onChange={(e) => setMake(e.target.value)}
+                    />
+
+                    <Input
+                      label="Model"
+                      required
+                      placeholder="e.g. AVENIS 125"
+                      value={model}
+                      onChange={(e) => setModel(e.target.value)}
+                    />
+
+                    <Input
+                      label="RTO Office"
+                      required
+                      placeholder="e.g. KL-53 Perinthalmanna SRTO"
+                      value={rto}
+                      onChange={(e) => setRto(e.target.value)}
+                      className="sm:col-span-2"
+                    />
+
+                    <Input
+                      label="Chassis Number (VIN)"
+                      placeholder="e.g. MB8DK11AYP8978120"
+                      value={chassisNumber}
+                      onChange={(e) => setChassisNumber(e.target.value)}
+                      className="font-mono text-xs uppercase"
+                    />
+
+                    <Input
+                      label="Engine Number"
+                      placeholder="e.g. AF32E8978120"
+                      value={engineNumber}
+                      onChange={(e) => setEngineNumber(e.target.value)}
+                      className="font-mono text-xs uppercase"
+                    />
+                  </div>
+
+                  {/* RC Expiry / Fitness Validity (Permanent 15-Year Rule for Private) */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <div className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-200/80 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-emerald-900">
+                        <div className="flex items-center gap-1.5">
+                          <FileCheck className="w-4 h-4 text-emerald-600" />
+                          <span>Fitness / RC Expiry Date</span>
+                        </div>
+                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                          Permanent RC Validity (15 Years)
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <Input
+                          label="Fitness Expiry Date"
+                          type="date"
+                          value={fitnessExpiryDate}
+                          onChange={(e) => setFitnessExpiryDate(e.target.value)}
+                        />
+                        <Input
+                          label="Fitness / RC Certificate No."
+                          placeholder="e.g. FC-KL53-2025-8978"
+                          value={fitnessNumber}
+                          onChange={(e) => setFitnessNumber(e.target.value)}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {!initialVehicle && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setClientMode(clientMode === 'AUTO_LOOKUP' ? 'SELECT_EXISTING' : 'AUTO_LOOKUP')
-                    }
-                    className="text-[11px] text-blue-600 hover:underline font-semibold"
-                  >
-                    {clientMode === 'AUTO_LOOKUP' ? 'Choose from Client List' : 'Direct Phone Input'}
-                  </button>
-                )}
+                {/* 2. CLIENT / OWNER PROFILE & POC */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        Client / Owner Profile
+                      </h3>
+                    </div>
+
+                    {!initialVehicle && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setClientMode(clientMode === 'AUTO_LOOKUP' ? 'SELECT_EXISTING' : 'AUTO_LOOKUP')
+                        }
+                        className="text-[11px] text-blue-600 hover:underline font-semibold"
+                      >
+                        {clientMode === 'AUTO_LOOKUP' ? 'Select Existing Client' : 'Direct Phone Input'}
+                      </button>
+                    )}
+                  </div>
+
+                  {clientMode === 'SELECT_EXISTING' ? (
+                    <div>
+                      <Select
+                        label="Select Existing Client"
+                        required
+                        value={selectedExistingClientId}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          setSelectedExistingClientId(id);
+                          const c = clients.find((item) => item.id === id);
+                          if (c) {
+                            setMatchedExistingClient(c);
+                            setClientMobile(c.mobile);
+                            setClientName(c.name);
+                            if (c.email) setClientEmail(c.email);
+                          }
+                        }}
+                      >
+                        <option value="">— Select a registered client —</option>
+                        {clients.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} • {c.mobile}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <Input
+                          label="Client Mobile Number"
+                          required
+                          placeholder="e.g. 9846012345"
+                          value={clientMobile}
+                          onChange={(e) => handlePhoneChange(e.target.value)}
+                        />
+
+                        <Input
+                          label="Full Name / Owner Name"
+                          required
+                          placeholder="e.g. Sayed Shahloob"
+                          value={clientName}
+                          onChange={(e) => setClientName(e.target.value)}
+                        />
+
+                        <Input
+                          label="Email Address (Alerts)"
+                          type="email"
+                          placeholder="client@gmail.com"
+                          value={clientEmail}
+                          onChange={(e) => setClientEmail(e.target.value)}
+                        />
+                      </div>
+
+                      {matchedExistingClient && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-50 border border-emerald-200/90 text-emerald-800 text-xs">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Existing Client: <strong>{matchedExistingClient.name}</strong> ({matchedExistingClient.mobile})</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Point of Contact (Driver / Manager) Accordion */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <div className="flex items-center justify-between pb-1">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={hasSeparatePoc}
+                          onChange={(e) => setHasSeparatePoc(e.target.checked)}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
+                        />
+                        <span className="flex items-center gap-1.5">
+                          <UserCheck className="w-3.5 h-3.5 text-teal-600" />
+                          Has Separate Driver / Field Contact (POC)
+                        </span>
+                      </label>
+                    </div>
+
+                    {hasSeparatePoc && (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 animate-in fade-in">
+                        <Input
+                          label="Driver / POC Name"
+                          placeholder="e.g. Sujith"
+                          value={pocName}
+                          onChange={(e) => setPocName(e.target.value)}
+                        />
+                        <Input
+                          label="POC Mobile"
+                          placeholder="e.g. 9847144556"
+                          value={pocMobile}
+                          onChange={(e) => setPocMobile(e.target.value)}
+                        />
+                        <Select
+                          label="Role"
+                          value={pocDesignation}
+                          onChange={(e) => setPocDesignation(e.target.value)}
+                        >
+                          <option value="Driver">Driver</option>
+                          <option value="Fleet Manager">Fleet Manager</option>
+                          <option value="Son / Relative">Son / Relative</option>
+                          <option value="Accountant">Accountant / Office</option>
+                          <option value="Other">Other Representative</option>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {clientMode === 'SELECT_EXISTING' ? (
-                <div>
+              {/* ======================================================== */}
+              {/* RIGHT COLUMN (5 Cols): PERIODIC COMPLIANCES, FEES, AGENT */}
+              {/* ======================================================== */}
+              <div className="lg:col-span-5 space-y-4">
+                {/* 3. PERIODIC COMPLIANCES (MANUAL ENTRY / RENEWALS) */}
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/40 via-white to-purple-50/20 border border-indigo-200/80 shadow-2xs space-y-3.5">
+                  <div className="flex items-center gap-2 pb-2 border-b border-indigo-100">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                      <Shield className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        Periodic Compliances (Manual Entry)
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Enter from client copy. Editable anytime for renewal alerts.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 3.1 Motor Insurance Policy */}
+                  <div className="p-3 rounded-xl bg-white border border-slate-200/90 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs font-bold text-blue-900">
+                      <div className="flex items-center gap-1.5">
+                        <Shield className="w-3.5 h-3.5 text-blue-600" />
+                        <span>1. Motor Insurance Policy</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-normal">Renewable Annual/5-Yr</span>
+                    </div>
+                    <div className="space-y-2">
+                      <Input
+                        label="Insurance Expiry Date"
+                        type="date"
+                        value={insuranceExpiryDate}
+                        onChange={(e) => setInsuranceExpiryDate(e.target.value)}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          label="Policy Number"
+                          placeholder="e.g. HDFC-POL-8978"
+                          value={insurancePolicyNumber}
+                          onChange={(e) => setInsurancePolicyNumber(e.target.value)}
+                        />
+                        <Input
+                          label="Insurance Provider"
+                          placeholder="e.g. HDFC ERGO"
+                          value={insuranceProvider}
+                          onChange={(e) => setInsuranceProvider(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3.2 Pollution Certificate (PUC / Poka) */}
+                  <div className="p-3 rounded-xl bg-white border border-slate-200/90 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs font-bold text-amber-900">
+                      <div className="flex items-center gap-1.5">
+                        <Flame className="w-3.5 h-3.5 text-amber-600" />
+                        <span>2. Pollution Certificate (PUC / Poka)</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-normal">Annual / 6-Month</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <Input
+                        label="PUC Expiry Date"
+                        type="date"
+                        value={pucExpiryDate}
+                        onChange={(e) => setPucExpiryDate(e.target.value)}
+                      />
+                      <Input
+                        label="PUC Certificate Number"
+                        placeholder="e.g. PUC-KL53-8978"
+                        value={pucNumber}
+                        onChange={(e) => setPucNumber(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. FINANCIAL LEDGER & ADVANCE BILLING */}
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/40 via-white to-orange-50/20 border border-amber-200/80 shadow-2xs space-y-3">
+                  <div className="flex items-center gap-2 pb-2 border-b border-amber-100">
+                    <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                      <Wallet className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        Financial Status &amp; Advance
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Tracks fees, advance received, and balances
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <Input
+                      label="Estimated Total Fee (₹)"
+                      type="number"
+                      placeholder="e.g. 5500"
+                      value={totalCost}
+                      onChange={(e) => setTotalCost(e.target.value)}
+                    />
+                    <Input
+                      label="Advance Received (₹)"
+                      type="number"
+                      placeholder="e.g. 2000"
+                      value={amountReceived}
+                      onChange={(e) => setAmountReceived(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Live Balance Banner */}
+                  {Boolean(totalCost || amountReceived) && (() => {
+                    const bal = calculatePaymentBalance(Number(totalCost || 0), Number(amountReceived || 0));
+                    if (bal.paymentStatus === 'REFUND_DUE') {
+                      return (
+                        <div className="p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 flex items-center justify-between text-xs font-semibold animate-in fade-in">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-purple-600 animate-ping" />
+                            Overpaid:
+                          </span>
+                          <span className="font-extrabold text-purple-700">
+                            Return ₹{bal.balanceAmount.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      );
+                    } else if (bal.paymentStatus === 'BALANCE_DUE') {
+                      return (
+                        <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between text-xs font-semibold animate-in fade-in">
+                          <span className="flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            Pending:
+                          </span>
+                          <span className="font-extrabold text-amber-700">
+                            Due ₹{bal.balanceAmount.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center justify-between text-xs font-semibold animate-in fade-in">
+                          <span className="flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            Settled:
+                          </span>
+                          <span className="font-extrabold text-emerald-700">
+                            ₹{bal.totalCost.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+
+                {/* 5. AGENT ASSIGNMENT & NOTES */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2.5">
                   <Select
-                    label="Select Existing Client"
+                    label="Assigned Agent"
                     required
-                    value={selectedExistingClientId}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      setSelectedExistingClientId(id);
-                      const c = clients.find((item) => item.id === id);
-                      if (c) {
-                        setMatchedExistingClient(c);
-                        setClientMobile(c.mobile);
-                        setClientName(c.name);
-                        setClientAddress(c.address);
-                        if (c.email) setClientEmail(c.email);
-                      }
-                    }}
+                    value={assignedAgentId}
+                    onChange={(e) => setAssignedAgentId(e.target.value)}
+                    disabled={currentUser?.role === 'AGENT'}
                   >
-                    <option value="">— Select a registered client —</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} • {c.mobile}
+                    {activeAgents.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.role})
                       </option>
                     ))}
                   </Select>
+
+                  <Input
+                    label="Internal Notes (Optional)"
+                    placeholder="e.g. Fast-track client, VIP renewal"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <Input
-                        label="Client Mobile Number (Unique Key)"
-                        required
-                        placeholder="e.g. 9846012345"
-                        value={clientMobile}
-                        onChange={(e) => handlePhoneChange(e.target.value)}
-                        helperText={
-                          matchedExistingClient
-                            ? 'Matched registered client! Auto-filling profile.'
-                            : 'Type phone number to auto-search or register new client'
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <Input
-                        label="Full Name / Owner Name"
-                        required
-                        placeholder="e.g. Mohammed Shafeek"
-                        value={clientName}
-                        onChange={(e) => setClientName(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Match status badge */}
-                  {matchedExistingClient ? (
-                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200/90 text-emerald-800 text-xs">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <div className="flex-1">
-                        <strong>Existing Client Found:</strong> {matchedExistingClient.name} ({matchedExistingClient.mobile})
-                        <span className="block text-[11px] text-emerald-700">
-                          This vehicle will be directly attached to this client record.
-                        </span>
-                      </div>
-                    </div>
-                  ) : clientMobile.length >= 10 ? (
-                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50 border border-blue-200/80 text-blue-800 text-xs">
-                      <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
-                      <div>
-                        <strong>New Client Detected:</strong> A new client profile for &quot;{clientName || 'Owner'}&quot; will be created seamlessly.
-                      </div>
-                    </div>
-                  ) : null}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Input
-                      label="Relationship Name (Son / Daughter / Wife of)"
-                      placeholder="e.g. ALEX JOHN"
-                      value={relationshipName}
-                      onChange={(e) => setRelationshipName(e.target.value)}
-                      helperText="Recorded on RC front card"
-                    />
-                    <Input
-                      label="PIN Code"
-                      placeholder="e.g. 691531"
-                      value={pincode}
-                      onChange={(e) => setPincode(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Input
-                      label="Client Address / Location"
-                      placeholder="e.g. Mamachenvila Vadakkethil, Kottarakkara, Kollam"
-                      value={clientAddress}
-                      onChange={(e) => setClientAddress(e.target.value)}
-                    />
-                    <Input
-                      label="Email Address (Optional)"
-                      type="email"
-                      placeholder="client@example.com"
-                      value={clientEmail}
-                      onChange={(e) => setClientEmail(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 2. VEHICLE SPECIFICATION CARD */}
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
-                  <Car className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Vehicle Specifications & Classification
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Registration number, brand, model, vehicle class, and category
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Input
-                  label="Registration Number"
-                  required
-                  placeholder="e.g. KL-24-J-8996"
-                  value={registrationNumber}
-                  onChange={(e) => setRegistrationNumber(e.target.value)}
-                  helperText="Auto-formatted & normalized for duplicate check"
-                />
-
-                <Select
-                  label="Vehicle Category"
-                  value={vehicleType}
-                  onChange={(e) => setVehicleType(e.target.value as VehicleType)}
-                >
-                  <option value="PRIVATE_CAR">Private Car (LMV)</option>
-                  <option value="COMMERCIAL_TAXI">Commercial Taxi / Cab</option>
-                  <option value="GOODS_CARRIER">Goods Carrier (LGV/HGV)</option>
-                  <option value="BUS">Bus / Passenger Transport</option>
-                  <option value="TWO_WHEELER">Two Wheeler / Motorcycle</option>
-                  <option value="AUTO_RICKSHAW">Auto Rickshaw</option>
-                  <option value="TRACTOR">Tractor / Agricultural</option>
-                  <option value="OTHER">Other Special Type</option>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Input
-                  label="Make (Manufacturer)"
-                  required
-                  placeholder="e.g. HONDA, Toyota, Maruti"
-                  value={make}
-                  onChange={(e) => setMake(e.target.value)}
-                />
-
-                <Input
-                  label="Model"
-                  required
-                  placeholder="e.g. HONDA DIO, Innova"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                />
-
-                <Input
-                  label="Vehicle Class (from RC)"
-                  placeholder="e.g. M-Cycle/Scooter, Motor Car"
-                  value={vehicleClass}
-                  onChange={(e) => setVehicleClass(e.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Select
-                  label="Fuel Type"
-                  value={fuelType}
-                  onChange={(e) => setFuelType(e.target.value as FuelType)}
-                >
-                  <option value="PETROL">Petrol</option>
-                  <option value="DIESEL">Diesel</option>
-                  <option value="CNG">CNG</option>
-                  <option value="ELECTRIC">Electric (EV)</option>
-                  <option value="HYBRID">Hybrid</option>
-                  <option value="OTHER">Other</option>
-                </Select>
-
-                <Input
-                  label="Manufacturing Year"
-                  type="number"
-                  value={manufacturingYear}
-                  onChange={(e) => setManufacturingYear(e.target.value ? Number(e.target.value) : '')}
-                  placeholder="e.g. 2015"
-                />
-
-                <Input
-                  label="Mfg Month / Year"
-                  placeholder="e.g. January 2015 (1-2015)"
-                  value={manufacturingMonthYear}
-                  onChange={(e) => setManufacturingMonthYear(e.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Input
-                  label="RTO Office Authority"
-                  required
-                  placeholder="e.g. Kottarakkara SRTO"
-                  value={rto}
-                  onChange={(e) => setRto(e.target.value)}
-                />
-
-                <Input
-                  label="Variant / Trim (Optional)"
-                  placeholder="e.g. Standard, 2.4 VX, ZXI+"
-                  value={variant}
-                  onChange={(e) => setVariant(e.target.value)}
-                />
               </div>
             </div>
 
-            {/* 3. DETAILED RC SMART CARD TECHNICAL & DIMENSION SPECIFICATIONS */}
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    RC Technical Specifications & Dimensions (Kerala Smart Card)
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Color, body type, seating capacity, weight, CC, horsepower, wheelbase, and cylinders
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Input
-                  label="Color"
-                  placeholder="e.g. M A Gray M"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                />
-
-                <Input
-                  label="Body Type"
-                  placeholder="e.g. SOLO, Saloon"
-                  value={bodyType}
-                  onChange={(e) => setBodyType(e.target.value)}
-                />
-
-                <Input
-                  label="Seating Capacity"
-                  type="number"
-                  placeholder="e.g. 2 or 5"
-                  value={seatingCapacity}
-                  onChange={(e) => setSeatingCapacity(e.target.value ? Number(e.target.value) : '')}
-                  helperText="Number of seats"
-                />
-
-                <Input
-                  label="Unladen Weight (kg)"
-                  type="number"
-                  placeholder="e.g. 111"
-                  value={unladenWeight}
-                  onChange={(e) => setUnladenWeight(e.target.value ? Number(e.target.value) : '')}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Input
-                  label="Engine Capacity (cc)"
-                  type="number"
-                  placeholder="e.g. 110"
-                  value={cubicCapacity}
-                  onChange={(e) => setCubicCapacity(e.target.value ? Number(e.target.value) : '')}
-                />
-
-                <Input
-                  label="Horsepower (BHP/Kw)"
-                  placeholder="e.g. 8 BHP"
-                  value={horsepower}
-                  onChange={(e) => setHorsepower(e.target.value)}
-                />
-
-                <Input
-                  label="Wheelbase (mm)"
-                  type="number"
-                  placeholder="e.g. 1238"
-                  value={wheelbase}
-                  onChange={(e) => setWheelbase(e.target.value ? Number(e.target.value) : '')}
-                />
-
-                <Input
-                  label="No. of Cylinders"
-                  type="number"
-                  placeholder="e.g. 1"
-                  value={cylinders}
-                  onChange={(e) => setCylinders(e.target.value ? Number(e.target.value) : '')}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Input
-                  label="Owner Serial Number"
-                  type="number"
-                  placeholder="e.g. 1 (1st Owner)"
-                  value={ownerSerial}
-                  onChange={(e) => setOwnerSerial(e.target.value ? Number(e.target.value) : '')}
-                />
-
-                <Input
-                  label="Financier / Hypothecation"
-                  placeholder="e.g. Not specified / HDFC Bank"
-                  value={financier}
-                  onChange={(e) => setFinancier(e.target.value)}
-                />
-
-                <Input
-                  label="Emission Norms"
-                  placeholder="e.g. Not Available / BS IV / BS VI"
-                  value={emissionNorms}
-                  onChange={(e) => setEmissionNorms(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* 4. TECHNICAL & REGISTRATION IDENTIFIERS */}
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
-                  <Shield className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Technical Identifiers & RTO Validity
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Chassis VIN, Engine number, registration validity
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Input
-                  label="Chassis Number (VIN)"
-                  placeholder="e.g. ME4JF392AF7270451"
-                  value={chassisNumber}
-                  onChange={(e) => setChassisNumber(e.target.value)}
-                />
-
-                <Input
-                  label="Engine / Motor Number"
-                  placeholder="e.g. JF39E70270467"
-                  value={engineNumber}
-                  onChange={(e) => setEngineNumber(e.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Input
-                  label="Registration Date"
-                  type="date"
-                  value={registrationDate}
-                  onChange={(e) => setRegistrationDate(e.target.value)}
-                  helperText="Date of Registration on RC"
-                />
-
-                <Input
-                  label="RC Registration Validity / Fitness"
-                  type="date"
-                  value={registrationValidity}
-                  onChange={(e) => setRegistrationValidity(e.target.value)}
-                  helperText="Validity date on RC smart card"
-                />
-              </div>
-            </div>
-
-            {/* 4. AGENT ASSIGNMENT & NOTES */}
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-3.5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Select
-                  label="Assigned Agent"
-                  required
-                  value={assignedAgentId}
-                  onChange={(e) => setAssignedAgentId(e.target.value)}
-                  disabled={currentUser?.role === 'AGENT'}
-                >
-                  {activeAgents.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} ({u.role})
-                    </option>
-                  ))}
-                </Select>
-
-                <Input
-                  label="Notes / Special Remarks"
-                  placeholder="e.g. Speed governor fitted, GPS installed"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+            {/* Form Actions Footer */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
               <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" isLoading={isSubmitting} className="gap-2">
+              <Button type="submit" variant="primary" isLoading={isSubmitting} className="gap-2 font-semibold px-5">
                 <CheckCircle2 className="w-4 h-4" />
-                {initialVehicle ? 'Update Vehicle' : 'Register Vehicle & Link Owner'}
+                {initialVehicle ? 'Update Vehicle' : 'Save Vehicle'}
               </Button>
             </div>
-          </form>
-        )}
+          </form>        )}
       </div>
     </Modal>
   );

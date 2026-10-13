@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { useApp } from '@/lib/store/app-context';
 import { Task, TaskPriority, TaskStatus } from '@/lib/types';
+import { calculatePaymentBalance } from '@/lib/utils';
+import { Wallet, UserCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -37,6 +39,14 @@ export function TaskModal({
   const [status, setStatus] = useState<TaskStatus>('PENDING');
   const [notes, setNotes] = useState('');
 
+  // Point of Contact (POC) / Field Driver
+  const [pocName, setPocName] = useState('');
+  const [pocMobile, setPocMobile] = useState('');
+
+  // Financial Ledger & Advance Payment
+  const [estimatedCost, setEstimatedCost] = useState('');
+  const [amountReceived, setAmountReceived] = useState('');
+
   const availableAgents = users.filter((u) => u.status === 'ACTIVE');
 
   // Filter vehicles for selected client
@@ -61,6 +71,10 @@ export function TaskModal({
       setPriority(initialTask.priority);
       setStatus(initialTask.status);
       setNotes(initialTask.notes || '');
+      setPocName(initialTask.pocName || '');
+      setPocMobile(initialTask.pocMobile || '');
+      setEstimatedCost(initialTask.estimatedCost ? String(initialTask.estimatedCost) : '');
+      setAmountReceived(initialTask.amountReceived ? String(initialTask.amountReceived) : '');
     } else {
       setClientId(initialClientId || (clients[0]?.id ?? ''));
       setVehicleId(initialVehicleId || '');
@@ -74,8 +88,15 @@ export function TaskModal({
       setPriority('NORMAL');
       setStatus('PENDING');
       setNotes('');
+
+      // Auto-populate from selected vehicle if available
+      const selVeh = vehicles.find((v) => v.id === (initialVehicleId || ''));
+      setPocName(selVeh?.pocName || '');
+      setPocMobile(selVeh?.pocMobile || '');
+      setEstimatedCost(selVeh?.totalCost ? String(selVeh.totalCost) : '');
+      setAmountReceived(selVeh?.amountReceived ? String(selVeh.amountReceived) : '');
     }
-  }, [initialTask, initialClientId, initialVehicleId, initialDocumentId, isOpen, clients, currentUser, users]);
+  }, [initialTask, initialClientId, initialVehicleId, initialDocumentId, isOpen, clients, currentUser, users, vehicles]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,32 +106,34 @@ export function TaskModal({
       return;
     }
 
+    const bal = calculatePaymentBalance(
+      estimatedCost ? Number(estimatedCost) : 0,
+      amountReceived ? Number(amountReceived) : 0
+    );
+
+    const taskPayload = {
+      clientId,
+      vehicleId,
+      documentId: documentId || undefined,
+      title,
+      description: description || undefined,
+      assignedTo,
+      dueDate,
+      priority,
+      status,
+      notes: notes || undefined,
+      pocName: pocName.trim() || undefined,
+      pocMobile: pocMobile.trim() || undefined,
+      estimatedCost: estimatedCost ? Number(estimatedCost) : undefined,
+      amountReceived: amountReceived ? Number(amountReceived) : undefined,
+      balanceAmount: (estimatedCost || amountReceived) ? bal.balanceAmount : undefined,
+      paymentStatus: (estimatedCost || amountReceived) ? bal.paymentStatus : undefined,
+    };
+
     if (initialTask) {
-      updateTask(initialTask.id, {
-        clientId,
-        vehicleId,
-        documentId: documentId || undefined,
-        title,
-        description: description || undefined,
-        assignedTo,
-        dueDate,
-        priority,
-        status,
-        notes: notes || undefined,
-      });
+      updateTask(initialTask.id, taskPayload);
     } else {
-      addTask({
-        clientId,
-        vehicleId,
-        documentId: documentId || undefined,
-        title,
-        description: description || undefined,
-        assignedTo,
-        dueDate,
-        priority,
-        status,
-        notes: notes || undefined,
-      });
+      addTask(taskPayload);
     }
 
     onClose();
@@ -197,6 +220,69 @@ export function TaskModal({
               </option>
             ))}
           </Select>
+        </div>
+
+        {/* Point of Contact (Driver / Field Representative) */}
+        <div className="p-3 rounded-xl bg-teal-50/60 border border-teal-200/80 space-y-2">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-teal-900">
+            <UserCheck className="w-3.5 h-3.5 text-teal-600" />
+            <span>Point of Contact (Driver / Ground Coordinator)</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="POC Name"
+              placeholder="e.g. Sujith (Driver)"
+              value={pocName}
+              onChange={(e) => setPocName(e.target.value)}
+            />
+            <Input
+              label="POC Mobile Number"
+              placeholder="e.g. 98471 44556"
+              value={pocMobile}
+              onChange={(e) => setPocMobile(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Financial Ledger & Advance Billing */}
+        <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-200/80 space-y-2.5">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
+            <Wallet className="w-3.5 h-3.5 text-amber-600" />
+            <span>Financial Status &amp; Advance Collection</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="Total Cost / Estimated Fee (₹)"
+              type="number"
+              placeholder="e.g. 5500"
+              value={estimatedCost}
+              onChange={(e) => setEstimatedCost(e.target.value)}
+            />
+            <Input
+              label="Amount Received (₹)"
+              type="number"
+              placeholder="e.g. 10000 or 2000"
+              value={amountReceived}
+              onChange={(e) => setAmountReceived(e.target.value)}
+            />
+          </div>
+          {Boolean(estimatedCost || amountReceived) && (() => {
+            const bal = calculatePaymentBalance(Number(estimatedCost || 0), Number(amountReceived || 0));
+            return (
+              <div
+                className={`p-2 rounded-lg text-xs font-semibold flex items-center justify-between ${
+                  bal.paymentStatus === 'REFUND_DUE'
+                    ? 'bg-purple-100 text-purple-800'
+                    : bal.paymentStatus === 'BALANCE_DUE'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-emerald-100 text-emerald-800'
+                }`}
+              >
+                <span>Settlement:</span>
+                <span className="font-bold">{bal.label}</span>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
