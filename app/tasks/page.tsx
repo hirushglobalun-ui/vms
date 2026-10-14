@@ -63,6 +63,7 @@ export default function TasksPage() {
   const [assignedFilter, setAssignedFilter] = useState<string>('ALL');
   const [docTypeFilter, setDocTypeFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [mobileColumn, setMobileColumn] = useState<'ALL' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED'>('ALL');
 
   // Modals
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -596,79 +597,129 @@ export default function TasksPage() {
 
       {/* VIEW 1: KANBAN BOARD */}
       {viewMode === 'KANBAN' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* COLUMN 1: PENDING */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 text-amber-900">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-                <h3 className="text-xs font-bold uppercase tracking-wider">Pending / To-Do</h3>
-              </div>
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-200/70 text-amber-900">
-                {kanbanPending.length}
-              </span>
-            </div>
-
-            <div className="space-y-3 min-h-[300px]">
-              {kanbanPending.length === 0 ? (
-                <div className="py-12 px-4 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200/80 flex flex-col items-center justify-center gap-2">
-                  <Clock className="w-7 h-7 text-amber-400/80 stroke-1" />
-                  <p className="text-xs font-medium text-slate-500">No pending tasks</p>
-                  <p className="text-[11px] text-slate-400">All renewals are up-to-date</p>
-                </div>
-              ) : (
-                kanbanPending.map((task) => renderKanbanCard(task))
-              )}
-            </div>
+        <div className="space-y-4">
+          {/* Mobile Column Tab Switcher */}
+          <div className="flex md:hidden items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl overflow-x-auto text-xs font-bold border border-slate-200/80">
+            <button
+              type="button"
+              onClick={() => setMobileColumn('ALL')}
+              className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-all cursor-pointer ${
+                mobileColumn === 'ALL'
+                  ? 'bg-white text-slate-900 shadow-2xs font-extrabold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              All ({filteredList.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileColumn('PENDING')}
+              className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-all cursor-pointer ${
+                mobileColumn === 'PENDING'
+                  ? 'bg-amber-100 text-amber-900 font-extrabold shadow-2xs'
+                  : 'text-slate-600 hover:text-amber-800'
+              }`}
+            >
+              Pending ({kanbanPending.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileColumn('IN_PROGRESS')}
+              className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-all cursor-pointer ${
+                mobileColumn === 'IN_PROGRESS'
+                  ? 'bg-blue-100 text-blue-900 font-extrabold shadow-2xs'
+                  : 'text-slate-600 hover:text-blue-800'
+              }`}
+            >
+              In Progress ({kanbanInProgress.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileColumn('COMPLETED')}
+              className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-all cursor-pointer ${
+                mobileColumn === 'COMPLETED'
+                  ? 'bg-emerald-100 text-emerald-900 font-extrabold shadow-2xs'
+                  : 'text-slate-600 hover:text-emerald-800'
+              }`}
+            >
+              Completed ({kanbanCompleted.length})
+            </button>
           </div>
 
-          {/* COLUMN 2: IN PROGRESS */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 text-blue-900">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                <h3 className="text-xs font-bold uppercase tracking-wider">In Progress / Processing</h3>
-              </div>
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-200/70 text-blue-900">
-                {kanbanInProgress.length}
-              </span>
-            </div>
-
-            <div className="space-y-3 min-h-[300px]">
-              {kanbanInProgress.length === 0 ? (
-                <div className="py-12 px-4 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200/80 flex flex-col items-center justify-center gap-2">
-                  <Play className="w-7 h-7 text-blue-400/80 stroke-1" />
-                  <p className="text-xs font-medium text-slate-500">No tasks currently in progress</p>
-                  <p className="text-[11px] text-slate-400">Click &ldquo;Start&rdquo; on any pending task to begin</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* COLUMN 1: PENDING */}
+            <div className={`space-y-3 ${mobileColumn === 'ALL' || mobileColumn === 'PENDING' ? 'block' : 'hidden md:block'}`}>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 text-amber-900">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider">Pending / To-Do</h3>
                 </div>
-              ) : (
-                kanbanInProgress.map((task) => renderKanbanCard(task))
-              )}
-            </div>
-          </div>
-
-          {/* COLUMN 3: COMPLETED */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/80 border border-emerald-200/80 text-emerald-900">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                <h3 className="text-xs font-bold uppercase tracking-wider">Completed / Renewed</h3>
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-200/70 text-amber-900">
+                  {kanbanPending.length}
+                </span>
               </div>
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-200/70 text-emerald-900">
-                {kanbanCompleted.length}
-              </span>
+
+              <div className="space-y-3 min-h-[300px]">
+                {kanbanPending.length === 0 ? (
+                  <div className="py-12 px-4 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200/80 flex flex-col items-center justify-center gap-2">
+                    <Clock className="w-7 h-7 text-amber-400/80 stroke-1" />
+                    <p className="text-xs font-medium text-slate-500">No pending tasks</p>
+                    <p className="text-[11px] text-slate-400">All renewals are up-to-date</p>
+                  </div>
+                ) : (
+                  kanbanPending.map((task) => renderKanbanCard(task))
+                )}
+              </div>
             </div>
 
-            <div className="space-y-3 min-h-[300px]">
-              {kanbanCompleted.length === 0 ? (
-                <div className="py-12 px-4 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200/80 flex flex-col items-center justify-center gap-2">
-                  <CheckCircle2 className="w-7 h-7 text-emerald-400/80 stroke-1" />
-                  <p className="text-xs font-medium text-slate-500">No completed tasks yet</p>
-                  <p className="text-[11px] text-slate-400">Completed renewal tasks will appear here</p>
+            {/* COLUMN 2: IN PROGRESS */}
+            <div className={`space-y-3 ${mobileColumn === 'ALL' || mobileColumn === 'IN_PROGRESS' ? 'block' : 'hidden md:block'}`}>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 text-blue-900">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider">In Progress / Processing</h3>
                 </div>
-              ) : (
-                kanbanCompleted.map((task) => renderKanbanCard(task))
-              )}
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-200/70 text-blue-900">
+                  {kanbanInProgress.length}
+                </span>
+              </div>
+
+              <div className="space-y-3 min-h-[300px]">
+                {kanbanInProgress.length === 0 ? (
+                  <div className="py-12 px-4 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200/80 flex flex-col items-center justify-center gap-2">
+                    <Play className="w-7 h-7 text-blue-400/80 stroke-1" />
+                    <p className="text-xs font-medium text-slate-500">No tasks currently in progress</p>
+                    <p className="text-[11px] text-slate-400">Click &ldquo;Start&rdquo; on any pending task to begin</p>
+                  </div>
+                ) : (
+                  kanbanInProgress.map((task) => renderKanbanCard(task))
+                )}
+              </div>
+            </div>
+
+            {/* COLUMN 3: COMPLETED */}
+            <div className={`space-y-3 ${mobileColumn === 'ALL' || mobileColumn === 'COMPLETED' ? 'block' : 'hidden md:block'}`}>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/80 border border-emerald-200/80 text-emerald-900">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider">Completed / Renewed</h3>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-200/70 text-emerald-900">
+                  {kanbanCompleted.length}
+                </span>
+              </div>
+
+              <div className="space-y-3 min-h-[300px]">
+                {kanbanCompleted.length === 0 ? (
+                  <div className="py-12 px-4 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200/80 flex flex-col items-center justify-center gap-2">
+                    <CheckCircle2 className="w-7 h-7 text-emerald-400/80 stroke-1" />
+                    <p className="text-xs font-medium text-slate-500">No completed tasks yet</p>
+                    <p className="text-[11px] text-slate-400">Completed renewal tasks will appear here</p>
+                  </div>
+                ) : (
+                  kanbanCompleted.map((task) => renderKanbanCard(task))
+                )}
+              </div>
             </div>
           </div>
         </div>

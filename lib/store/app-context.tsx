@@ -269,11 +269,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  // When Firebase is configured and user is authenticated, attach live Firestore listeners
+  // When Firebase is configured and user has an active Firebase Auth session, attach live Firestore listeners
   useEffect(() => {
-    if (!isFirebaseConfigured || !currentUser) return;
+    if (!isFirebaseConfigured || !currentUser || !auth?.currentUser) return;
 
-    // Only attach remote listeners if there is an active Firebase Auth session or configured DB
+    // Only attach remote listeners if there is an active Firebase Auth session
     const unsubClients = subscribeClients(currentUser.role, currentUser.id, (data) => {
       if (data && data.length > 0) {
         setClients(data);
@@ -354,12 +354,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentUser(user);
         return;
       } catch (fbErr: any) {
-        // If Firebase Auth fails, gracefully check if it's one of our mock demo accounts
-        const existingMock = users.find(
-          (u) =>
-            u.email.toLowerCase() === resolvedEmail ||
-            u.email.toLowerCase() === email.toLowerCase().trim()
-        );
+        // If Firebase Auth fails, gracefully check if demo mode is permitted
+        const allowDemoAuth = process.env.NEXT_PUBLIC_ENABLE_DEMO_ACCOUNTS !== 'false';
+        const existingMock = allowDemoAuth
+          ? users.find(
+              (u) =>
+                u.email.toLowerCase() === resolvedEmail ||
+                u.email.toLowerCase() === email.toLowerCase().trim()
+            )
+          : null;
 
         if (existingMock) {
           if (existingMock.status === 'INACTIVE') {
@@ -370,7 +373,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return;
         }
 
-        // If not a mock account, throw original Firebase error
+        // If not a mock account or in strict production mode, throw original Firebase error
         throw fbErr;
       }
     } else {
@@ -1197,27 +1200,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     if (newTasksToAdd.length > 0) {
-      setTasks((prev) => {
-        const updated = [...newTasksToAdd, ...prev];
-        saveState('tasks', updated);
-        return updated;
+      queueMicrotask(() => {
+        setTasks((prev) => {
+          const updated = [...newTasksToAdd, ...prev];
+          saveState('tasks', updated);
+          return updated;
+        });
+
+        if (newNotifsToAdd.length > 0) {
+          setNotifications((prev) => {
+            const updated = [...newNotifsToAdd, ...prev];
+            saveState('notifications', updated);
+            return updated;
+          });
+        }
+
+        if (newLogsToAdd.length > 0) {
+          setActivityLogs((prev) => {
+            const updated = [...newLogsToAdd, ...prev];
+            saveState('activityLogs', updated);
+            return updated;
+          });
+        }
       });
-
-      if (newNotifsToAdd.length > 0) {
-        setNotifications((prev) => {
-          const updated = [...newNotifsToAdd, ...prev];
-          saveState('notifications', updated);
-          return updated;
-        });
-      }
-
-      if (newLogsToAdd.length > 0) {
-        setActivityLogs((prev) => {
-          const updated = [...newLogsToAdd, ...prev];
-          saveState('activityLogs', updated);
-          return updated;
-        });
-      }
     }
   }, [evaluatedDocuments, vehicles, clients, users, isLoading]);
 

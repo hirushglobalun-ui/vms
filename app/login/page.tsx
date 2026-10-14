@@ -28,6 +28,9 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null);
 
+  // Demo accounts are gated for production deployment security
+  const showDemoAccounts = process.env.NEXT_PUBLIC_ENABLE_DEMO_ACCOUNTS !== 'false';
+
   // Exactly 1 Admin and 1 Agent only (no more)
   const DEMO_ACCOUNTS = [
     {
@@ -212,82 +215,84 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* ALL DUMMY AGENT & ADMIN CREDENTIALS SELECTOR */}
-        <div className="mt-5 pt-4 border-t border-slate-100 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-slate-600 font-bold uppercase tracking-wider flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-blue-600" />
-              Dummy Staff Accounts
-            </span>
-            <span className="text-[10px] text-slate-400 font-mono">
-              Password: <strong className="text-slate-600 font-bold">password</strong>
-            </span>
-          </div>
+        {/* ALL DUMMY AGENT & ADMIN CREDENTIALS SELECTOR - Gated by NEXT_PUBLIC_ENABLE_DEMO_ACCOUNTS */}
+        {showDemoAccounts && (
+          <div className="mt-5 pt-4 border-t border-slate-100 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-slate-600 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-blue-600" />
+                Dummy Staff Accounts
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                Password: <strong className="text-slate-600 font-bold">password</strong>
+              </span>
+            </div>
 
-          <div className="grid grid-cols-1 gap-1.5">
-            {DEMO_ACCOUNTS.map((acc) => {
-              const isSelected = selectedDemoId === acc.id;
-              return (
-                <button
-                  key={acc.id}
-                  id={`demo-account-${acc.id}`}
-                  type="button"
-                  onClick={() => handleQuickFill(acc)}
-                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between group ${
-                    isSelected
-                      ? 'bg-blue-50/90 border-blue-500 ring-2 ring-blue-500/20 shadow-xs'
-                      : 'bg-slate-50/80 hover:bg-blue-50/40 border-slate-200/90 hover:border-blue-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                        acc.role === 'ADMIN'
-                          ? 'bg-blue-100 text-blue-700'
-                          : isSelected
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-slate-200/80 text-slate-700'
-                      }`}
-                    >
-                      {acc.role === 'ADMIN' ? (
-                        <ShieldCheck className="w-4 h-4" />
+            <div className="grid grid-cols-1 gap-1.5">
+              {DEMO_ACCOUNTS.map((acc) => {
+                const isSelected = selectedDemoId === acc.id;
+                return (
+                  <button
+                    key={acc.id}
+                    id={`demo-account-${acc.id}`}
+                    type="button"
+                    onClick={() => handleQuickFill(acc)}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between group ${
+                      isSelected
+                        ? 'bg-blue-50/90 border-blue-500 ring-2 ring-blue-500/20 shadow-xs'
+                        : 'bg-slate-50/80 hover:bg-blue-50/40 border-slate-200/90 hover:border-blue-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                          acc.role === 'ADMIN'
+                            ? 'bg-blue-100 text-blue-700'
+                            : isSelected
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-slate-200/80 text-slate-700'
+                        }`}
+                      >
+                        {acc.role === 'ADMIN' ? (
+                          <ShieldCheck className="w-4 h-4" />
+                        ) : (
+                          <UserCheck className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <strong className="text-xs font-bold text-slate-900 truncate">
+                            {acc.name}
+                          </strong>
+                          <span
+                            className={`text-[9px] px-1.5 py-0.2 rounded-full border font-bold uppercase tracking-wider ${acc.badgeColor}`}
+                          >
+                            {acc.badge}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-mono truncate">
+                          {acc.email}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 pl-2">
+                      {isSelected ? (
+                        <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">
+                          <Check className="w-3 h-3" />
+                        </span>
                       ) : (
-                        <UserCheck className="w-4 h-4" />
+                        <span className="text-[10px] font-bold text-blue-600 group-hover:underline">
+                          Auto-fill
+                        </span>
                       )}
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <strong className="text-xs font-bold text-slate-900 truncate">
-                          {acc.name}
-                        </strong>
-                        <span
-                          className={`text-[9px] px-1.5 py-0.2 rounded-full border font-bold uppercase tracking-wider ${acc.badgeColor}`}
-                        >
-                          {acc.badge}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 font-mono truncate">
-                        {acc.email}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="shrink-0 pl-2">
-                    {isSelected ? (
-                      <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">
-                        <Check className="w-3 h-3" />
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-bold text-blue-600 group-hover:underline">
-                        Auto-fill
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Security & System Footer (Inside Card) */}
         <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">

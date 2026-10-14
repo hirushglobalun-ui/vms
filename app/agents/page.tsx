@@ -127,7 +127,7 @@ export default function AgentsPage() {
       </div>
 
       {/* Agents Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4.5 sm:gap-5">
         {agentsList.map(({ agent, clientsCount, vehiclesCount, pendingTasks, completedTasks, overdueCount }) => (
           <Card key={agent.id} className="hover:border-purple-300 transition-colors flex flex-col justify-between">
             <CardHeader className="p-5 pb-3">
