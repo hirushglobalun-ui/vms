@@ -12,7 +12,7 @@ import {
   Vehicle,
   VehicleDocument,
 } from '../types';
-import { isFirebaseConfigured } from '../firebase/config';
+import { isFirebaseConfigured, auth } from '../firebase/config';
 import { signInStaff, signOutStaff, subscribeAuthState, createStaffAccount } from '../firebase/auth';
 import {
   subscribeClients,
@@ -183,95 +183,151 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Check auth state & subscribe to Firestore when configured
+  // Always hydrate from local storage on mount so data is never lost across builds or reloads
   useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem(`${STORAGE_KEY_PREFIX}user`);
+      const storedClients = localStorage.getItem(`${STORAGE_KEY_PREFIX}clients`);
+      const storedVehicles = localStorage.getItem(`${STORAGE_KEY_PREFIX}vehicles`);
+      const storedDocs = localStorage.getItem(`${STORAGE_KEY_PREFIX}documents`);
+      const storedTasks = localStorage.getItem(`${STORAGE_KEY_PREFIX}tasks`);
+      const storedLogs = localStorage.getItem(`${STORAGE_KEY_PREFIX}activityLogs`);
+      const storedNotifs = localStorage.getItem(`${STORAGE_KEY_PREFIX}notifications`);
+      const storedSettings = localStorage.getItem(`${STORAGE_KEY_PREFIX}settings`);
+      const storedUsers = localStorage.getItem(`${STORAGE_KEY_PREFIX}users`);
+
+      if (storedUser) {
+        try { setCurrentUser(JSON.parse(storedUser)); } catch {}
+      }
+      if (storedClients) {
+        try {
+          const parsed = JSON.parse(storedClients);
+          if (Array.isArray(parsed) && parsed.length > 0) setClients(parsed);
+        } catch {}
+      }
+      if (storedVehicles) {
+        try {
+          const parsed = JSON.parse(storedVehicles);
+          if (Array.isArray(parsed) && parsed.length > 0) setVehicles(parsed);
+        } catch {}
+      }
+      if (storedDocs) {
+        try {
+          const parsed = JSON.parse(storedDocs);
+          if (Array.isArray(parsed) && parsed.length > 0) setDocuments(parsed);
+        } catch {}
+      }
+      if (storedTasks) {
+        try {
+          const parsed = JSON.parse(storedTasks);
+          if (Array.isArray(parsed) && parsed.length > 0) setTasks(parsed);
+        } catch {}
+      }
+      if (storedLogs) {
+        try {
+          const parsed = JSON.parse(storedLogs);
+          if (Array.isArray(parsed) && parsed.length > 0) setActivityLogs(parsed);
+        } catch {}
+      }
+      if (storedNotifs) {
+        try {
+          const parsed = JSON.parse(storedNotifs);
+          if (Array.isArray(parsed) && parsed.length > 0) setNotifications(parsed);
+        } catch {}
+      }
+      if (storedSettings) {
+        try { setSettings(JSON.parse(storedSettings)); } catch {}
+      }
+      if (storedUsers) {
+        try {
+          const parsed = JSON.parse(storedUsers);
+          if (Array.isArray(parsed) && parsed.length > 0) setUsers(parsed);
+        } catch {}
+      }
+    } catch (e) {
+      console.error('LocalStorage hydration error:', e);
+    } finally {
+      setIsLoading(false);
+    }
+
+    // If Firebase is configured, listen for live auth state changes
     if (isFirebaseConfigured) {
-      setIsLoading(true);
-      // Subscribe to real Firebase Auth
       const unsubAuth = subscribeAuthState(async (user, error) => {
         if (error) {
           console.warn('Auth state message:', error);
         }
-        setCurrentUser(user);
+        if (user) {
+          setCurrentUser(user);
+          saveState('user', user);
+        }
         setIsLoading(false);
       });
 
       return () => {
         unsubAuth();
       };
-    } else {
-      // In development when env variables are not yet populated
-      try {
-        const storedUser = localStorage.getItem(`${STORAGE_KEY_PREFIX}user`);
-        const storedClients = localStorage.getItem(`${STORAGE_KEY_PREFIX}clients`);
-        const storedVehicles = localStorage.getItem(`${STORAGE_KEY_PREFIX}vehicles`);
-        const storedDocs = localStorage.getItem(`${STORAGE_KEY_PREFIX}documents`);
-        const storedTasks = localStorage.getItem(`${STORAGE_KEY_PREFIX}tasks`);
-        const storedLogs = localStorage.getItem(`${STORAGE_KEY_PREFIX}activityLogs`);
-        const storedNotifs = localStorage.getItem(`${STORAGE_KEY_PREFIX}notifications`);
-        const storedSettings = localStorage.getItem(`${STORAGE_KEY_PREFIX}settings`);
-
-        if (storedUser) setCurrentUser(JSON.parse(storedUser));
-        if (storedClients) setClients(JSON.parse(storedClients));
-        const isDummyVeh = (id: string) => /^veh_[0-9]{1,3}$/.test(id);
-        const isDummyDoc = (id: string) => /^doc_[0-9]{1,3}$/.test(id);
-        const isDummyTask = (id: string) => /^task_[0-9]{1,3}$/.test(id);
-        const isDummyNotif = (id: string) => /^notif_[0-9]{1,3}$/.test(id);
-        const isDummyLog = (id: string) => /^log_[0-9]{1,3}$/.test(id);
-
-        if (storedVehicles) {
-          const parsed: Vehicle[] = JSON.parse(storedVehicles);
-          const cleaned = parsed.filter((v) => !isDummyVeh(v.id));
-          setVehicles(cleaned);
-          saveState('vehicles', cleaned);
-        }
-        if (storedDocs) {
-          const parsed: VehicleDocument[] = JSON.parse(storedDocs);
-          const cleaned = parsed.filter((d) => !isDummyDoc(d.id) && !isDummyVeh(d.vehicleId));
-          setDocuments(cleaned);
-          saveState('documents', cleaned);
-        }
-        if (storedTasks) {
-          const parsed: Task[] = JSON.parse(storedTasks);
-          const cleaned = parsed.filter((t) => !isDummyTask(t.id) && (!t.vehicleId || !isDummyVeh(t.vehicleId)));
-          setTasks(cleaned);
-          saveState('tasks', cleaned);
-        }
-        if (storedLogs) {
-          const parsed: ActivityLog[] = JSON.parse(storedLogs);
-          const cleaned = parsed.filter((l) => !isDummyLog(l.id) && (!l.entityId || !isDummyVeh(l.entityId)));
-          setActivityLogs(cleaned);
-          saveState('activityLogs', cleaned);
-        }
-        if (storedNotifs) {
-          const parsed: Notification[] = JSON.parse(storedNotifs);
-          const cleaned = parsed.filter((n) => !isDummyNotif(n.id) && (!n.relatedVehicleId || !isDummyVeh(n.relatedVehicleId)));
-          setNotifications(cleaned);
-          saveState('notifications', cleaned);
-        }
-        if (storedSettings) setSettings(JSON.parse(storedSettings));
-      } catch (e) {
-        console.error('LocalStorage load error:', e);
-      } finally {
-        setIsLoading(false);
-      }
     }
   }, []);
 
-  // When Firebase is configured and user is logged in, attach live Firestore listeners
+  // When Firebase is configured and user is authenticated, attach live Firestore listeners
   useEffect(() => {
     if (!isFirebaseConfigured || !currentUser) return;
 
-    const unsubClients = subscribeClients(currentUser.role, currentUser.id, (data) => setClients(data));
-    const unsubVehicles = subscribeVehicles(currentUser.role, currentUser.id, (data) => setVehicles(data));
-    const unsubDocs = subscribeDocuments((data) => setDocuments(data));
-    const unsubTasks = subscribeTasks(currentUser.role, currentUser.id, (data) => setTasks(data));
-    const unsubNotifs = subscribeNotifications(currentUser.id, (data) => setNotifications(data));
-    const unsubLogs = subscribeActivityLogs((data) => setActivityLogs(data));
-    const unsubUsers = subscribeUsers((data) => setUsers(data));
+    // Only attach remote listeners if there is an active Firebase Auth session or configured DB
+    const unsubClients = subscribeClients(currentUser.role, currentUser.id, (data) => {
+      if (data && data.length > 0) {
+        setClients(data);
+        saveState('clients', data);
+      }
+    });
+
+    const unsubVehicles = subscribeVehicles(currentUser.role, currentUser.id, (data) => {
+      if (data && data.length > 0) {
+        setVehicles(data);
+        saveState('vehicles', data);
+      }
+    });
+
+    const unsubDocs = subscribeDocuments((data) => {
+      if (data && data.length > 0) {
+        setDocuments(data);
+        saveState('documents', data);
+      }
+    });
+
+    const unsubTasks = subscribeTasks(currentUser.role, currentUser.id, (data) => {
+      if (data && data.length > 0) {
+        setTasks(data);
+        saveState('tasks', data);
+      }
+    });
+
+    const unsubNotifs = subscribeNotifications(currentUser.id, (data) => {
+      if (data && data.length > 0) {
+        setNotifications(data);
+        saveState('notifications', data);
+      }
+    });
+
+    const unsubLogs = subscribeActivityLogs((data) => {
+      if (data && data.length > 0) {
+        setActivityLogs(data);
+        saveState('activityLogs', data);
+      }
+    });
+
+    const unsubUsers = subscribeUsers((data) => {
+      if (data && data.length > 0) {
+        setUsers(data);
+        saveState('users', data);
+      }
+    });
 
     getSystemSettingsDoc().then((s) => {
-      if (s) setSettings(s);
+      if (s) {
+        setSettings(s);
+        saveState('settings', s);
+      }
     });
 
     return () => {
@@ -375,55 +431,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // CLIENTS CRUD
   const addClient = async (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>): Promise<string> => {
     const creatorId = currentUser?.id || 'system';
-    if (isFirebaseConfigured) {
-      const id = await addClientDoc(clientData, creatorId);
-      await addActivityLogDoc({
-        userId: creatorId,
-        userName: currentUser?.name || 'Staff',
-        action: 'CLIENT_CREATED',
-        entityType: 'CLIENT',
-        entityId: id,
-        description: `Registered new client: ${clientData.name} (${clientData.mobile})`,
-      });
-      return id;
-    } else {
-      const id = `client_${Date.now()}`;
-      const newClient: Client = {
-        ...clientData,
-        id,
-        createdBy: creatorId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setClients((prev) => {
-        const updated = [newClient, ...prev];
-        saveState('clients', updated);
-        return updated;
-      });
-      return id;
+    let id = `client_${Date.now()}`;
+
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        const firestoreId = await addClientDoc(clientData, creatorId);
+        id = firestoreId;
+        await addActivityLogDoc({
+          userId: creatorId,
+          userName: currentUser?.name || 'Staff',
+          action: 'CLIENT_CREATED',
+          entityType: 'CLIENT',
+          entityId: id,
+          description: `Registered new client: ${clientData.name} (${clientData.mobile})`,
+        });
+      } catch (fbErr: any) {
+        console.warn('Firestore addClient failed, falling back to local state:', fbErr);
+      }
     }
+
+    const newClient: Client = {
+      ...clientData,
+      id,
+      createdBy: creatorId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setClients((prev) => {
+      const updated = [newClient, ...prev.filter(c => c.id !== id)];
+      saveState('clients', updated);
+      return updated;
+    });
+    return id;
   };
 
   const updateClient = async (id: string, updates: Partial<Client>) => {
-    if (isFirebaseConfigured) {
-      await updateClientDoc(id, updates);
-      await addActivityLogDoc({
-        userId: currentUser?.id || 'system',
-        userName: currentUser?.name || 'Staff',
-        action: 'CLIENT_UPDATED',
-        entityType: 'CLIENT',
-        entityId: id,
-        description: `Updated client record.`,
-      });
-    } else {
-      setClients((prev) => {
-        const updated = prev.map((c) =>
-          c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c
-        );
-        saveState('clients', updated);
-        return updated;
-      });
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        await updateClientDoc(id, updates);
+        await addActivityLogDoc({
+          userId: currentUser?.id || 'system',
+          userName: currentUser?.name || 'Staff',
+          action: 'CLIENT_UPDATED',
+          entityType: 'CLIENT',
+          entityId: id,
+          description: `Updated client record.`,
+        });
+        return;
+      } catch (fbErr: any) {
+        console.warn('Firestore updateClient failed, falling back to local state:', fbErr);
+      }
     }
+
+    setClients((prev) => {
+      const updated = prev.map((c) =>
+        c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c
+      );
+      saveState('clients', updated);
+      return updated;
+    });
   };
 
   const deactivateClient = async (id: string) => {
@@ -437,60 +503,70 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const creatorId = currentUser?.id || 'system';
     const norm = normalizeRegistrationNumber(vehData.registrationNumber);
 
-    if (isFirebaseConfigured) {
-      const id = await addVehicleDoc(vehData, creatorId);
-      await addActivityLogDoc({
-        userId: creatorId,
-        userName: currentUser?.name || 'Staff',
-        action: 'VEHICLE_CREATED',
-        entityType: 'VEHICLE',
-        entityId: id,
-        description: `Registered vehicle ${vehData.registrationNumber} (${vehData.make} ${vehData.model})`,
-      });
-      return id;
-    } else {
-      // Local duplicate check
-      const dup = vehicles.find((v) => v.normalizedRegistrationNumber === norm && v.status === 'ACTIVE');
-      if (dup) {
-        throw new Error(`Vehicle with registration number ${vehData.registrationNumber} is already registered!`);
-      }
-
-      const id = `veh_${Date.now()}`;
-      const newVeh: Vehicle = {
-        ...vehData,
-        id,
-        normalizedRegistrationNumber: norm,
-        createdBy: creatorId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setVehicles((prev) => {
-        const updated = [newVeh, ...prev];
-        saveState('vehicles', updated);
-        return updated;
-      });
-      return id;
+    // Duplicate check
+    const dup = vehicles.find((v) => v.normalizedRegistrationNumber === norm && v.status === 'ACTIVE');
+    if (dup) {
+      throw new Error(`Vehicle with registration number ${vehData.registrationNumber} is already registered!`);
     }
+
+    let id = `veh_${Date.now()}`;
+
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        const firestoreId = await addVehicleDoc(vehData, creatorId);
+        id = firestoreId;
+        await addActivityLogDoc({
+          userId: creatorId,
+          userName: currentUser?.name || 'Staff',
+          action: 'VEHICLE_CREATED',
+          entityType: 'VEHICLE',
+          entityId: id,
+          description: `Registered vehicle ${vehData.registrationNumber} (${vehData.make} ${vehData.model})`,
+        });
+      } catch (fbErr: any) {
+        console.warn('Firestore addVehicle failed, falling back to local state:', fbErr);
+      }
+    }
+
+    const newVeh: Vehicle = {
+      ...vehData,
+      id,
+      normalizedRegistrationNumber: norm,
+      createdBy: creatorId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setVehicles((prev) => {
+      const updated = [newVeh, ...prev.filter(v => v.id !== id)];
+      saveState('vehicles', updated);
+      return updated;
+    });
+    return id;
   };
 
   const updateVehicle = async (id: string, updates: Partial<Vehicle>) => {
-    if (isFirebaseConfigured) {
-      await updateVehicleDoc(id, updates);
-    } else {
-      setVehicles((prev) => {
-        const updated = prev.map((v) => {
-          if (v.id === id) {
-            const norm = updates.registrationNumber
-              ? normalizeRegistrationNumber(updates.registrationNumber)
-              : v.normalizedRegistrationNumber;
-            return { ...v, ...updates, normalizedRegistrationNumber: norm, updatedAt: new Date().toISOString() };
-          }
-          return v;
-        });
-        saveState('vehicles', updated);
-        return updated;
-      });
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        await updateVehicleDoc(id, updates);
+        return;
+      } catch (fbErr: any) {
+        console.warn('Firestore updateVehicle failed, falling back to local state:', fbErr);
+      }
     }
+
+    setVehicles((prev) => {
+      const updated = prev.map((v) => {
+        if (v.id === id) {
+          const norm = updates.registrationNumber
+            ? normalizeRegistrationNumber(updates.registrationNumber)
+            : v.normalizedRegistrationNumber;
+          return { ...v, ...updates, normalizedRegistrationNumber: norm, updatedAt: new Date().toISOString() };
+        }
+        return v;
+      });
+      saveState('vehicles', updated);
+      return updated;
+    });
   };
 
   const deactivateVehicle = async (id: string) => {
@@ -499,38 +575,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteClient = async (id: string) => {
     if (isFirebaseConfigured) {
-      await deleteClientDoc(id);
-    } else {
-      setClients((prev) => {
-        const updated = prev.filter((c) => c.id !== id);
-        saveState('clients', updated);
-        return updated;
-      });
+      try {
+        await deleteClientDoc(id);
+      } catch (fbErr: any) {
+        console.warn('Firestore deleteClient failed, updating local state:', fbErr);
+      }
     }
+    setClients((prev) => {
+      const updated = prev.filter((c) => c.id !== id);
+      saveState('clients', updated);
+      return updated;
+    });
   };
 
   const deleteVehicle = async (id: string) => {
     if (isFirebaseConfigured) {
-      await deleteVehicleDoc(id);
-    } else {
-      setVehicles((prev) => {
-        const updated = prev.filter((v) => v.id !== id);
-        saveState('vehicles', updated);
-        return updated;
-      });
+      try {
+        await deleteVehicleDoc(id);
+      } catch (fbErr: any) {
+        console.warn('Firestore deleteVehicle failed, updating local state:', fbErr);
+      }
     }
+    setVehicles((prev) => {
+      const updated = prev.filter((v) => v.id !== id);
+      saveState('vehicles', updated);
+      return updated;
+    });
   };
 
   const deleteDocument = async (id: string) => {
     if (isFirebaseConfigured) {
-      await deleteDocumentDoc(id);
-    } else {
-      setDocuments((prev) => {
-        const updated = prev.filter((d) => d.id !== id);
-        saveState('documents', updated);
-        return updated;
-      });
+      try {
+        await deleteDocumentDoc(id);
+      } catch (fbErr: any) {
+        console.warn('Firestore deleteDocument failed, updating local state:', fbErr);
+      }
     }
+    setDocuments((prev) => {
+      const updated = prev.filter((d) => d.id !== id);
+      saveState('documents', updated);
+      return updated;
+    });
   };
 
   // DOCUMENTS CRUD
@@ -538,47 +623,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     docData: Omit<VehicleDocument, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'createdBy'>
   ): Promise<string> => {
     const creatorId = currentUser?.id || 'system';
-    if (isFirebaseConfigured) {
-      const id = await addVehicleDocumentDoc(docData, creatorId);
-      return id;
-    } else {
-      const status = calculateRenewalStatus(docData.expiryDate, docData.reminderDays);
-      const id = `doc_${Date.now()}`;
-      const newDoc: VehicleDocument = {
-        ...docData,
-        id,
-        status,
-        isHistorical: false,
-        createdBy: creatorId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setDocuments((prev) => {
-        const updated = [newDoc, ...prev];
-        saveState('documents', updated);
-        return updated;
-      });
-      return id;
+    let id = `doc_${Date.now()}`;
+
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        const firestoreId = await addVehicleDocumentDoc(docData, creatorId);
+        id = firestoreId;
+      } catch (fbErr: any) {
+        console.warn('Firestore addDocument failed, falling back to local state:', fbErr);
+      }
     }
+
+    const status = calculateRenewalStatus(docData.expiryDate, docData.reminderDays);
+    const newDoc: VehicleDocument = {
+      ...docData,
+      id,
+      status,
+      isHistorical: false,
+      createdBy: creatorId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setDocuments((prev) => {
+      const updated = [newDoc, ...prev.filter(d => d.id !== id)];
+      saveState('documents', updated);
+      return updated;
+    });
+    return id;
   };
 
   const updateDocument = async (id: string, updates: Partial<VehicleDocument>) => {
-    if (isFirebaseConfigured) {
-      await updateVehicleDocumentDoc(id, updates);
-    } else {
-      setDocuments((prev) => {
-        const updated = prev.map((d) => {
-          if (d.id === id) {
-            const merged = { ...d, ...updates, updatedAt: new Date().toISOString() };
-            merged.status = calculateRenewalStatus(merged.expiryDate, merged.reminderDays, merged.isHistorical);
-            return merged;
-          }
-          return d;
-        });
-        saveState('documents', updated);
-        return updated;
-      });
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        await updateVehicleDocumentDoc(id, updates);
+        return;
+      } catch (fbErr: any) {
+        console.warn('Firestore updateDocument failed, falling back to local state:', fbErr);
+      }
     }
+
+    setDocuments((prev) => {
+      const updated = prev.map((d) => {
+        if (d.id === id) {
+          const merged = { ...d, ...updates, updatedAt: new Date().toISOString() };
+          merged.status = calculateRenewalStatus(merged.expiryDate, merged.reminderDays, merged.isHistorical);
+          return merged;
+        }
+        return d;
+      });
+      saveState('documents', updated);
+      return updated;
+    });
   };
 
   const completeRenewalCycle = async (
@@ -602,159 +697,78 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const userId = currentUser?.id || 'system';
 
-    if (isFirebaseConfigured) {
-      return await completeRenewalCycleDoc(oldDoc, newDetails, userId, taskIdToComplete);
-    } else {
-      const updatedOld: VehicleDocument = {
-        ...oldDoc,
-        isHistorical: true,
-        status: 'COMPLETED',
-        updatedAt: new Date().toISOString(),
-      };
+    const updatedOld: VehicleDocument = {
+      ...oldDoc,
+      isHistorical: true,
+      status: 'COMPLETED',
+      updatedAt: new Date().toISOString(),
+    };
 
-      const newDocStatus = calculateRenewalStatus(newDetails.newExpiryDate, oldDoc.reminderDays, false);
-      const newDocId = `doc_${Date.now()}`;
-      const newDoc: VehicleDocument = {
-        ...oldDoc,
-        id: newDocId,
-        documentNumber: newDetails.newDocumentNumber || oldDoc.documentNumber,
-        issueDate: newDetails.newIssueDate || new Date().toISOString().split('T')[0],
-        expiryDate: newDetails.newExpiryDate,
-        amount: newDetails.newAmount ?? oldDoc.amount,
-        amountReceived: newDetails.amountReceived,
-        balanceAmount: newDetails.balanceAmount,
-        paymentStatus: newDetails.paymentStatus,
-        notes: newDetails.notes || `Renewed. Previous cycle archived to history.`,
-        fileName: newDetails.fileName || oldDoc.fileName,
-        fileUrl: newDetails.fileUrl || oldDoc.fileUrl,
-        isHistorical: false,
-        status: newDocStatus,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        createdBy: userId,
-      };
+    const newDocStatus = calculateRenewalStatus(newDetails.newExpiryDate, oldDoc.reminderDays, false);
+    const newDocId = `doc_${Date.now()}`;
+    const newDoc: VehicleDocument = {
+      ...oldDoc,
+      id: newDocId,
+      documentNumber: newDetails.newDocumentNumber || oldDoc.documentNumber,
+      issueDate: newDetails.newIssueDate || new Date().toISOString().split('T')[0],
+      expiryDate: newDetails.newExpiryDate,
+      amount: newDetails.newAmount ?? oldDoc.amount,
+      amountReceived: newDetails.amountReceived,
+      balanceAmount: newDetails.balanceAmount,
+      paymentStatus: newDetails.paymentStatus,
+      notes: newDetails.notes || `Renewed. Previous cycle archived to history.`,
+      fileName: newDetails.fileName || oldDoc.fileName,
+      fileUrl: newDetails.fileUrl || oldDoc.fileUrl,
+      isHistorical: false,
+      status: newDocStatus,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      createdBy: userId,
+    };
 
-      setDocuments((prev) => {
-        const filtered = prev.filter((d) => d.id !== oldDocumentId);
-        const updated = [newDoc, updatedOld, ...filtered];
-        saveState('documents', updated);
-        return updated;
-      });
+    setDocuments((prev) => {
+      const filtered = prev.filter((d) => d.id !== oldDocumentId);
+      const updated = [newDoc, updatedOld, ...filtered];
+      saveState('documents', updated);
+      return updated;
+    });
 
-      // Update vehicle financial status if vehicleId present
-      if (oldDoc.vehicleId) {
-        setVehicles((prev) => {
-          const updated = prev.map((v) => {
-            if (v.id === oldDoc.vehicleId) {
-              return {
-                ...v,
-                totalCost: newDetails.newAmount ?? v.totalCost,
-                amountReceived: newDetails.amountReceived ?? v.amountReceived,
-                balanceAmount: newDetails.balanceAmount ?? v.balanceAmount,
-                paymentStatus: newDetails.paymentStatus ?? v.paymentStatus,
-                updatedAt: new Date().toISOString(),
-              };
-            }
-            return v;
-          });
-          saveState('vehicles', updated);
-          return updated;
+    // Update vehicle financial status if vehicleId present
+    if (oldDoc.vehicleId) {
+      setVehicles((prev) => {
+        const updated = prev.map((v) => {
+          if (v.id === oldDoc.vehicleId) {
+            return {
+              ...v,
+              totalCost: newDetails.newAmount ?? v.totalCost,
+              amountReceived: newDetails.amountReceived ?? v.amountReceived,
+              balanceAmount: newDetails.balanceAmount ?? v.balanceAmount,
+              paymentStatus: newDetails.paymentStatus ?? v.paymentStatus,
+              updatedAt: new Date().toISOString(),
+            };
+          }
+          return v;
         });
-      }
-
-      // Update task with financial details
-      if (taskIdToComplete) {
-        setTasks((prev) => {
-          const updated = prev.map((t) => {
-            if (t.id === taskIdToComplete) {
-              return {
-                ...t,
-                status: 'COMPLETED' as const,
-                completedAt: new Date().toISOString(),
-                completedBy: userId,
-                completionNotes: newDetails.notes || `Renewal completed with new expiry: ${newDetails.newExpiryDate}`,
-                estimatedCost: newDetails.newAmount,
-                amountReceived: newDetails.amountReceived,
-                balanceAmount: newDetails.balanceAmount,
-                paymentStatus: newDetails.paymentStatus,
-                updatedAt: new Date().toISOString(),
-              };
-            }
-            return t;
-          });
-          saveState('tasks', updated);
-          return updated;
-        });
-      }
-
-      return newDocId;
-    }
-  };
-
-  // TASKS CRUD
-  const addTask = async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>): Promise<string> => {
-    const creatorId = currentUser?.id || 'system';
-
-    if (isFirebaseConfigured) {
-      return await addTaskDoc(taskData, creatorId);
-    } else {
-      // Local duplicate task check (Section 12)
-      if (taskData.documentId && taskData.vehicleId) {
-        const existing = tasks.find(
-          (t) =>
-            t.vehicleId === taskData.vehicleId &&
-            t.documentId === taskData.documentId &&
-            (t.status === 'PENDING' || t.status === 'CLIENT_CONTACTED' || t.status === 'PROCESSING')
-        );
-        if (existing) {
-          throw new Error('An active task already exists for this vehicle renewal follow-up.');
-        }
-      }
-
-      const id = `task_${Date.now()}`;
-      const newTask: Task = {
-        ...taskData,
-        id,
-        createdBy: creatorId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setTasks((prev) => {
-        const updated = [newTask, ...prev];
-        saveState('tasks', updated);
-        return updated;
-      });
-      return id;
-    }
-  };
-
-  const updateTask = async (id: string, updates: Partial<Task>) => {
-    if (isFirebaseConfigured) {
-      await updateTaskDoc(id, updates);
-    } else {
-      setTasks((prev) => {
-        const updated = prev.map((t) =>
-          t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
-        );
-        saveState('tasks', updated);
+        saveState('vehicles', updated);
         return updated;
       });
     }
-  };
 
-  const completeTask = async (id: string, notes?: string) => {
-    if (isFirebaseConfigured) {
-      await completeTaskDoc(id, currentUser?.id || 'system', notes);
-    } else {
+    // Update task with financial details
+    if (taskIdToComplete) {
       setTasks((prev) => {
         const updated = prev.map((t) => {
-          if (t.id === id) {
+          if (t.id === taskIdToComplete) {
             return {
               ...t,
               status: 'COMPLETED' as const,
               completedAt: new Date().toISOString(),
-              completedBy: currentUser?.id || 'system',
-              completionNotes: notes || t.completionNotes,
+              completedBy: userId,
+              completionNotes: newDetails.notes || `Renewal completed with new expiry: ${newDetails.newExpiryDate}`,
+              estimatedCost: newDetails.newAmount,
+              amountReceived: newDetails.amountReceived,
+              balanceAmount: newDetails.balanceAmount,
+              paymentStatus: newDetails.paymentStatus,
               updatedAt: new Date().toISOString(),
             };
           }
@@ -764,24 +778,133 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return updated;
       });
     }
+
+    // Cloud Firestore Sync (background, non-blocking)
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        await completeRenewalCycleDoc(oldDoc, newDetails, userId, taskIdToComplete);
+      } catch (fbErr: any) {
+        console.warn('Firestore completeRenewalCycleDoc sync failed, local state preserved:', fbErr);
+      }
+    }
+
+    return newDocId;
+  };
+
+  // TASKS CRUD
+  const addTask = async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>): Promise<string> => {
+    const creatorId = currentUser?.id || 'system';
+
+    // Duplicate task prevention: prevent exact duplicate active tasks for the same vehicle
+    if (taskData.vehicleId && taskData.title) {
+      const existing = tasks.find(
+        (t) =>
+          t.vehicleId === taskData.vehicleId &&
+          t.title.trim().toLowerCase() === taskData.title.trim().toLowerCase() &&
+          (t.status === 'PENDING' || t.status === 'CLIENT_CONTACTED' || t.status === 'PROCESSING')
+      );
+      if (existing) {
+        throw new Error('An active task with this title already exists for this vehicle.');
+      }
+    }
+
+    const id = `task_${Date.now()}`;
+    const newTask: Task = {
+      ...taskData,
+      id,
+      createdBy: creatorId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setTasks((prev) => {
+      const updated = [newTask, ...prev];
+      saveState('tasks', updated);
+      return updated;
+    });
+
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        await addTaskDoc(taskData, creatorId);
+      } catch (fbErr: any) {
+        console.warn('Firestore addTaskDoc sync failed, local state preserved:', fbErr);
+      }
+    }
+
+    return id;
+  };
+
+  const updateTask = async (id: string, updates: Partial<Task>) => {
+    // 1. Optimistic Local State Update (instant Kanban / List UI feedback)
+    setTasks((prev) => {
+      const updated = prev.map((t) =>
+        t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
+      );
+      saveState('tasks', updated);
+      return updated;
+    });
+
+    // 2. Cloud Firestore Sync (background, resilient)
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        await updateTaskDoc(id, updates);
+      } catch (fbErr: any) {
+        console.warn('Firestore updateTaskDoc sync failed, local state preserved:', fbErr);
+      }
+    }
+  };
+
+  const completeTask = async (id: string, notes?: string) => {
+    // 1. Optimistic Local State Update
+    setTasks((prev) => {
+      const updated = prev.map((t) => {
+        if (t.id === id) {
+          return {
+            ...t,
+            status: 'COMPLETED' as const,
+            completedAt: new Date().toISOString(),
+            completedBy: currentUser?.id || 'system',
+            completionNotes: notes || t.completionNotes,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return t;
+      });
+      saveState('tasks', updated);
+      return updated;
+    });
+
+    // 2. Cloud Firestore Sync
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        await completeTaskDoc(id, currentUser?.id || 'system', notes);
+      } catch (fbErr: any) {
+        console.warn('Firestore completeTaskDoc sync failed, local state preserved:', fbErr);
+      }
+    }
   };
 
   const deleteTask = async (id: string) => {
     if (isFirebaseConfigured) {
-      await deleteTaskDoc(id);
-    } else {
-      setTasks((prev) => {
-        const updated = prev.filter((t) => t.id !== id);
-        saveState('tasks', updated);
-        return updated;
-      });
+      try {
+        await deleteTaskDoc(id);
+      } catch (fbErr: any) {
+        console.warn('Firestore deleteTask failed, updating local state:', fbErr);
+      }
     }
+    setTasks((prev) => {
+      const updated = prev.filter((t) => t.id !== id);
+      saveState('tasks', updated);
+      return updated;
+    });
   };
 
   const addAgent = async (
     agentData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>,
     password?: string
   ): Promise<string> => {
+    let createdId = `user_${Date.now()}`;
+
     if (isFirebaseConfigured) {
       if (password && password.trim().length >= 6) {
         try {
@@ -792,99 +915,155 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             agentData.mobile,
             agentData.role
           );
-          return created.id;
+          createdId = created.id;
         } catch (err) {
           console.warn('Firebase Auth user creation fallback to Firestore doc:', err);
-          return await addUserDoc(agentData);
+          try {
+            createdId = await addUserDoc(agentData);
+          } catch (docErr) {
+            console.warn('Firestore addUserDoc failed, falling back to local state:', docErr);
+          }
+        }
+      } else {
+        try {
+          createdId = await addUserDoc(agentData);
+        } catch (docErr) {
+          console.warn('Firestore addUserDoc failed, falling back to local state:', docErr);
         }
       }
-      return await addUserDoc(agentData);
-    } else {
-      const id = `user_${Date.now()}`;
-      const newAgent: User = {
-        ...agentData,
-        id,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setUsers((prev) => {
-        const updated = [newAgent, ...prev];
+    }
+
+    const newAgent: User = {
+      ...agentData,
+      id: createdId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setUsers((prev) => {
+      const existing = prev.find((u) => u.id === createdId || u.email.toLowerCase() === agentData.email.toLowerCase());
+      if (existing) {
+        const updated = prev.map((u) => (u.id === existing.id ? { ...u, ...newAgent } : u));
         saveState('users', updated);
         return updated;
-      });
-      return id;
-    }
+      }
+      const updated = [newAgent, ...prev];
+      saveState('users', updated);
+      return updated;
+    });
+    return createdId;
   };
 
   const updateAgent = async (id: string, updates: Partial<User>) => {
     if (isFirebaseConfigured) {
-      await updateUserDoc(id, updates);
-    } else {
-      setUsers((prev) => {
-        const updated = prev.map((u) => (u.id === id ? { ...u, ...updates, updatedAt: new Date().toISOString() } : u));
-        saveState('users', updated);
-        return updated;
-      });
+      try {
+        await updateUserDoc(id, updates);
+      } catch (fbErr: any) {
+        console.warn('Firestore updateUserDoc failed, updating local state:', fbErr);
+      }
     }
-  };
-
-  const deleteAgent = async (id: string) => {
-    if (isFirebaseConfigured) {
-      await deleteUserDoc(id);
-    } else {
-      setUsers((prev) => {
-        const updated = prev.filter((u) => u.id !== id);
-        saveState('users', updated);
-        return updated;
-      });
-    }
-  };
-
-  // NOTIFICATIONS
-  const markNotificationAsRead = async (id: string) => {
-    if (isFirebaseConfigured) {
-      await markNotificationReadDoc(id);
-    } else {
-      setNotifications((prev) => {
-        const updated = prev.map((n) => (n.id === id ? { ...n, isRead: true } : n));
-        saveState('notifications', updated);
-        return updated;
-      });
-    }
-  };
-
-  const markAllNotificationsRead = async () => {
-    if (isFirebaseConfigured) {
-      if (currentUser) await markAllNotificationsReadDoc(currentUser.id);
-    } else {
-      setNotifications((prev) => {
-        const updated = prev.map((n) => ({ ...n, isRead: true }));
-        saveState('notifications', updated);
-        return updated;
-      });
-    }
-  };
-
-  const clearAllNotifications = async () => {
-    if (isFirebaseConfigured && currentUser) {
-      await clearAllNotificationsDoc(currentUser.id);
-    }
-    setNotifications((prev) => {
-      const updated = isAgent ? prev.filter((n) => n.userId !== agentId) : [];
-      saveState('notifications', updated);
+    setUsers((prev) => {
+      const updated = prev.map((u) => (u.id === id ? { ...u, ...updates, updatedAt: new Date().toISOString() } : u));
+      saveState('users', updated);
       return updated;
     });
   };
 
-  const deleteNotification = async (id: string) => {
+  const deleteAgent = async (id: string) => {
     if (isFirebaseConfigured) {
-      await deleteNotificationDoc(id);
+      try {
+        await deleteUserDoc(id);
+      } catch (fbErr: any) {
+        console.warn('Firestore deleteUserDoc failed, updating local state:', fbErr);
+      }
     }
+    setUsers((prev) => {
+      const updated = prev.filter((u) => u.id !== id);
+      saveState('users', updated);
+      return updated;
+    });
+  };
+
+  // NOTIFICATIONS
+  const markNotificationAsRead = async (id: string) => {
+    // 1. Immediately update local state & localStorage
+    setNotifications((prev) => {
+      const updated = prev.map((n) => (n.id === id ? { ...n, isRead: true } : n));
+      saveState('notifications', updated);
+      return updated;
+    });
+
+    // 2. Best-effort sync to Firestore
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        await markNotificationReadDoc(id);
+      } catch (fbErr: any) {
+        console.warn('Firestore markNotificationReadDoc skipped/failed:', fbErr);
+      }
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    // 1. Immediately mark all notifications as read in local state & localStorage
+    setNotifications((prev) => {
+      const targetUserId = currentUser?.id;
+      const updated = prev.map((n) => {
+        if (!targetUserId || n.userId === targetUserId || currentUser?.role === 'ADMIN') {
+          return { ...n, isRead: true };
+        }
+        return n;
+      });
+      saveState('notifications', updated);
+      return updated;
+    });
+
+    // 2. Best-effort sync to Firestore
+    if (isFirebaseConfigured && auth?.currentUser && currentUser) {
+      try {
+        await markAllNotificationsReadDoc(currentUser.id);
+      } catch (fbErr: any) {
+        console.warn('Firestore markAllNotificationsReadDoc skipped/failed:', fbErr);
+      }
+    }
+  };
+
+  const clearAllNotifications = async () => {
+    // 1. Immediately clear notifications from local state & localStorage
+    setNotifications((prev) => {
+      const targetUserId = currentUser?.id;
+      const updated = isAgent
+        ? prev.filter((n) => n.userId !== agentId)
+        : prev.filter((n) => targetUserId && n.userId !== targetUserId && currentUser?.role !== 'ADMIN');
+      const finalUpdated = currentUser?.role === 'ADMIN' ? [] : updated;
+      saveState('notifications', finalUpdated);
+      return finalUpdated;
+    });
+
+    // 2. Best-effort sync to Firestore
+    if (isFirebaseConfigured && auth?.currentUser && currentUser) {
+      try {
+        await clearAllNotificationsDoc(currentUser.id);
+      } catch (fbErr: any) {
+        console.warn('Firestore clearAllNotificationsDoc skipped/failed:', fbErr);
+      }
+    }
+  };
+
+  const deleteNotification = async (id: string) => {
+    // 1. Immediately remove notification from local state & localStorage
     setNotifications((prev) => {
       const updated = prev.filter((n) => n.id !== id);
       saveState('notifications', updated);
       return updated;
     });
+
+    // 2. Best-effort sync to Firestore
+    if (isFirebaseConfigured && auth?.currentUser) {
+      try {
+        await deleteNotificationDoc(id);
+      } catch (fbErr: any) {
+        console.warn('Firestore deleteNotificationDoc skipped/failed:', fbErr);
+      }
+    }
   };
 
   // SETTINGS

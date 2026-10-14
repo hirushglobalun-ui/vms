@@ -16,6 +16,7 @@ import {
   Users,
   KeyRound,
 } from 'lucide-react';
+import { validateEmail } from '@/lib/validation';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -54,10 +55,17 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    const emailVal = validateEmail(email, true);
+    if (!emailVal.isValid) {
+      setError(emailVal.error || 'Please enter a valid staff email address.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      await loginStaff(email, password);
+      await loginStaff(email.trim().toLowerCase(), password);
       router.push('/dashboard');
     } catch (err: any) {
       console.error('Login attempt failed:', err);

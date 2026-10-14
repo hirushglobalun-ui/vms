@@ -12,8 +12,8 @@ import { TaskStatusBadge, PriorityBadge } from '@/components/shared/status-badge
 import { WhatsAppModal } from '@/components/shared/whatsapp-modal';
 import { WhatsAppIcon } from '@/components/ui/whatsapp-icon';
 import { Modal } from '@/components/ui/modal';
-import { Task, TaskStatus, VehicleDocument } from '@/lib/types';
-import { calculatePaymentBalance, formatCurrency } from '@/lib/utils';
+import { DocumentType, Task, TaskStatus, VehicleDocument } from '@/lib/types';
+
 import {
   CheckSquare,
   Plus,
@@ -35,7 +35,6 @@ import {
   Clock,
   ArrowRight,
   Sparkles,
-  Wallet,
   UserCheck,
   AlertCircle,
 } from 'lucide-react';
@@ -49,6 +48,7 @@ export default function TasksPage() {
     documents,
     users,
     currentUser,
+    addDocument,
     updateTask,
     completeTask,
     deleteTask,
@@ -169,21 +169,63 @@ export default function TasksPage() {
     return filteredList.slice(start, start + pageSize);
   }, [filteredList, currentPage, pageSize]);
 
-  // Trigger Completion Modal (Prompts "Valid until when?")
+  // Trigger Completion Modal (Prompts "New Expiry Date & Upload Document")
   const handleCompleteClick = (task: Task) => {
-    if (task.documentId) {
-      const doc = documents.find((d) => d.id === task.documentId);
-      const veh = vehicles.find((v) => v.id === task.vehicleId);
-      if (doc) {
-        setCompletionData({
-          isOpen: true,
-          document: doc,
-          linkedTaskId: task.id,
-          registrationNumber: veh?.registrationNumber || 'Vehicle',
-        });
-        return;
+    let doc = documents.find((d) => d.id === task.documentId && !d.isHistorical);
+    const veh = vehicles.find((v) => v.id === task.vehicleId);
+
+    // If task.documentId is not directly found, match document by type + vehicleId
+    if (!doc && veh) {
+      const titleLower = ((task.title || '') + ' ' + (task.description || '')).toLowerCase();
+      let targetType: DocumentType = 'INSURANCE';
+      if (titleLower.includes('puc') || titleLower.includes('pollution')) {
+        targetType = 'PUC';
+      } else if (titleLower.includes('fitness')) {
+        targetType = 'FITNESS';
+      } else if (titleLower.includes('tax') || titleLower.includes('road_tax')) {
+        targetType = 'ROAD_TAX';
+      } else if (titleLower.includes('permit')) {
+        targetType = 'PERMIT';
+      } else if (titleLower.includes('rc')) {
+        targetType = 'RC';
+      } else if (titleLower.includes('insurance')) {
+        targetType = 'INSURANCE';
+      }
+
+      doc = documents.find((d) => d.vehicleId === veh.id && d.documentType === targetType && !d.isHistorical);
+
+      // If document doesn't exist yet, provision one so user can enter new expiry and upload file
+      if (!doc) {
+        const newDocId = `doc_${Date.now()}`;
+        const createdDoc: VehicleDocument = {
+          id: newDocId,
+          vehicleId: veh.id,
+          clientId: veh.clientId,
+          documentType: targetType,
+          documentNumber: '',
+          expiryDate: task.dueDate || new Date().toISOString().split('T')[0],
+          reminderDays: 30,
+          status: 'OVERDUE',
+          isHistorical: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          createdBy: currentUser?.id || 'system',
+        };
+        addDocument(createdDoc);
+        doc = createdDoc;
       }
     }
+
+    if (doc) {
+      setCompletionData({
+        isOpen: true,
+        document: doc,
+        linkedTaskId: task.id,
+        registrationNumber: veh?.registrationNumber || 'Vehicle',
+      });
+      return;
+    }
+
     completeTask(task.id, 'Task marked complete by staff');
   };
 
@@ -250,13 +292,6 @@ export default function TasksPage() {
     const doc = documents.find((d) => d.id === task.documentId);
     const agent = users.find((u) => u.id === task.assignedTo);
 
-    // Compute live financial settlement
-    const cost = task.estimatedCost ?? veh?.totalCost ?? 0;
-    const received = task.amountReceived ?? veh?.amountReceived ?? 0;
-    const paymentSummary = (cost > 0 || received > 0)
-      ? calculatePaymentBalance(cost, received)
-      : null;
-
     return (
       <div
         key={task.id}
@@ -272,30 +307,6 @@ export default function TasksPage() {
           </div>
           <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
             <PriorityBadge priority={task.priority} />
-            {paymentSummary && (
-              paymentSummary.paymentStatus === 'REFUND_DUE' ? (
-                <span
-                  className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-700 border border-purple-200 shadow-2xs whitespace-nowrap"
-                  title="Client Overpaid — Refund excess advance to client"
-                >
-                  Refund: ₹{paymentSummary.balanceAmount.toLocaleString('en-IN')}
-                </span>
-              ) : paymentSummary.paymentStatus === 'BALANCE_DUE' ? (
-                <span
-                  className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 shadow-2xs whitespace-nowrap"
-                  title="Client owes balance payment"
-                >
-                  Due: ₹{paymentSummary.balanceAmount.toLocaleString('en-IN')}
-                </span>
-              ) : (
-                <span
-                  className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs whitespace-nowrap"
-                  title="Payment settled"
-                >
-                  Settled
-                </span>
-              )
-            )}
           </div>
         </div>
 
@@ -470,6 +481,17 @@ export default function TasksPage() {
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <Button
+            size="sm"
+            onClick={() => {
+              setEditingTask(null);
+              setIsTaskModalOpen(true);
+            }}
+            className="text-xs gap-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-xs cursor-pointer h-9 px-3.5"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Task
+          </Button>
+
           {/* View Mode Toggle */}
           <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
             <button
@@ -497,16 +519,6 @@ export default function TasksPage() {
               <span>Table List</span>
             </button>
           </div>
-
-          <Button
-            onClick={() => setIsTaskModalOpen(true)}
-            variant="primary"
-            size="sm"
-            className="gap-2 font-semibold shadow-xs"
-          >
-            <Plus className="w-4 h-4" />
-            Create Task
-          </Button>
         </div>
       </div>
 
@@ -697,33 +709,6 @@ export default function TasksPage() {
                           </span>
                           <PriorityBadge priority={task.priority} />
                           <TaskStatusBadge status={task.status} />
-                          {(() => {
-                            const cost = task.estimatedCost ?? veh?.totalCost ?? 0;
-                            const received = task.amountReceived ?? veh?.amountReceived ?? 0;
-                            if (cost > 0 || received > 0) {
-                              const bal = calculatePaymentBalance(cost, received);
-                              if (bal.paymentStatus === 'REFUND_DUE') {
-                                return (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-700 border border-purple-200">
-                                    Refund: ₹{bal.balanceAmount.toLocaleString('en-IN')}
-                                  </span>
-                                );
-                              } else if (bal.paymentStatus === 'BALANCE_DUE') {
-                                return (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">
-                                    Due: ₹{bal.balanceAmount.toLocaleString('en-IN')}
-                                  </span>
-                                );
-                              } else {
-                                return (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                    Settled
-                                  </span>
-                                );
-                              }
-                            }
-                            return null;
-                          })()}
                         </div>
 
                         {task.description && (
@@ -938,65 +923,7 @@ export default function TasksPage() {
                 </div>
               )}
 
-              {/* Financial Ledger & Advance Payment Status */}
-              {(() => {
-                const cost = inspectTask.estimatedCost ?? veh?.totalCost ?? 0;
-                const received = inspectTask.amountReceived ?? veh?.amountReceived ?? 0;
-                const bal = (cost > 0 || received > 0) ? calculatePaymentBalance(cost, received) : null;
 
-                if (!bal) return null;
-
-                return (
-                  <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/60 via-white to-orange-50/40 border border-amber-200/90 space-y-3">
-                    <div className="flex items-center justify-between border-b border-amber-100 pb-2">
-                      <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                        <Wallet className="w-4 h-4 text-amber-600" />
-                        Billing Ledger &amp; Advance Status
-                      </span>
-                      <span className="text-xs font-bold font-mono">
-                        {bal.paymentStatus === 'REFUND_DUE' ? (
-                          <span className="text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
-                            Return to Client: ₹{bal.balanceAmount.toLocaleString('en-IN')}
-                          </span>
-                        ) : bal.paymentStatus === 'BALANCE_DUE' ? (
-                          <span className="text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
-                            Due from Client: ₹{bal.balanceAmount.toLocaleString('en-IN')}
-                          </span>
-                        ) : (
-                          <span className="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                            Settled
-                          </span>
-                        )}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                      <div className="p-2.5 rounded-xl bg-white border border-amber-100">
-                        <span className="text-[10px] text-slate-400 block font-bold uppercase">Estimated / Total Fee</span>
-                        <strong className="text-slate-900 text-sm font-mono">₹{bal.totalCost.toLocaleString('en-IN')}</strong>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-white border border-amber-100">
-                        <span className="text-[10px] text-slate-400 block font-bold uppercase">Amount Received</span>
-                        <strong className="text-slate-900 text-sm font-mono">₹{bal.amountReceived.toLocaleString('en-IN')}</strong>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-white border border-amber-100">
-                        <span className="text-[10px] text-slate-400 block font-bold uppercase">Net Settlement</span>
-                        <strong
-                          className={`text-sm font-mono ${
-                            bal.paymentStatus === 'REFUND_DUE'
-                              ? 'text-purple-700 font-extrabold'
-                              : bal.paymentStatus === 'BALANCE_DUE'
-                              ? 'text-amber-700 font-extrabold'
-                              : 'text-emerald-700'
-                          }`}
-                        >
-                          {bal.label}
-                        </strong>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
 
               {/* Point of Contact (POC) / Driver if present */}
               {(veh?.pocName || inspectTask.pocName) && (

@@ -94,15 +94,19 @@ export async function createStaffAccount(
     updatedAt: new Date().toISOString(),
   };
 
-  await setDoc(doc(db, 'users', uid), {
-    name: newUser.name,
-    email: newUser.email,
-    mobile: newUser.mobile,
-    role: newUser.role,
-    status: newUser.status,
-    createdAt: newUser.createdAt,
-    updatedAt: newUser.updatedAt,
-  });
+  try {
+    await setDoc(doc(db, 'users', uid), {
+      name: newUser.name,
+      email: newUser.email,
+      mobile: newUser.mobile,
+      role: newUser.role,
+      status: newUser.status,
+      createdAt: newUser.createdAt,
+      updatedAt: newUser.updatedAt,
+    });
+  } catch (fsErr: any) {
+    console.warn('Firestore user doc creation skipped or restricted by rules:', fsErr);
+  }
 
   return newUser;
 }

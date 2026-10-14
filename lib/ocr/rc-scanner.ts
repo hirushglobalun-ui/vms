@@ -1,5 +1,6 @@
 import { FuelType, VehicleType } from '@/lib/types';
 import { normalizeRegistrationNumber } from '@/lib/utils';
+import { KERALA_RTO_MAP } from '@/lib/vahan/lookup';
 
 export interface ExtractedRcData {
   registrationNumber?: string;
@@ -171,30 +172,54 @@ export function parseRcText(rawText: string): ExtractedRcData {
     }
   }
 
-  // 3. Engine / Motor Number (Never capture label words like "NUMBER", "MOTOR", "ENGINE")
+  // 3. Engine / Motor Number
   let foundEngine: string | undefined;
+  const engineBlacklist = new Set([
+    'NUMBER', 'MOTOR', 'ENGINE', 'CHASSIS', 'COLOR', 'BODY', 'SEATING', 'PETROL',
+    'DIESEL', 'VEHICLE', 'CLASS', 'MAKER', 'MAKERS', 'MODEL', 'WEIGHT', 'UNLADEN',
+    'KERALA', 'INDIA', 'KERALAGOV', 'TRANSPORT', 'COMMISSIONER', 'GOVERNMENT', 'ADDRESS'
+  ]);
+
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i].toUpperCase();
-    if (l.includes('ENGINE') || l.includes('MOTOR NUMBER') || l.includes('ENG NO') || l.includes('MOTOR NO')) {
-      const parts = l.split(/NUMBER|NO/);
-      if (parts[1]) {
-        const m = parts[1].trim().match(/^[A-Z0-9]{6,16}/);
-        if (m && !['NUMBER', 'MOTOR', 'ENGINE', 'CHASSIS', 'COLOR', 'BODY'].includes(m[0])) {
-          foundEngine = m[0];
+    if (l.includes('ENGINE') || l.includes('MOTOR NO') || l.includes('ENG NO') || l.includes('ENG. NO') || l.includes('MOTOR NUMBER')) {
+      // Look for candidate on the same line after labels (e.g. Engine No / Motor No: AF21ED123456)
+      const cleaned = l.replace(/.*(?:ENGINE\s*(?:NO|NUMBER|\.)*|MOTOR\s*(?:NO|NUMBER|\.)*|ENG\s*(?:NO|NUMBER|\.)*)(?:\s*\/\s*MOTOR\s*(?:NO|NUMBER|\.)*)?[\s:.-]*/i, '').trim();
+      const tokens = cleaned.split(/[\s,;:|/]+/);
+      for (const t of tokens) {
+        const candidate = t.replace(/[^A-Z0-9-]/g, '');
+        if (candidate.length >= 6 && candidate.length <= 18 && !engineBlacklist.has(candidate) && /[0-9]/.test(candidate)) {
+          foundEngine = candidate;
           break;
         }
       }
-      if (i + 1 < lines.length) {
+
+      // If not on same line, look on the next line
+      if (!foundEngine && i + 1 < lines.length) {
         const nextL = lines[i + 1].toUpperCase().trim();
-        const nextM = nextL.match(/\b([A-Z0-9]{7,16})\b/);
-        if (nextM && !['NUMBER', 'MOTOR', 'ENGINE', 'CHASSIS', 'COLOR', 'BODY', 'SEATING', 'PETROL', 'DIESEL'].includes(nextM[1])) {
-          // Normalizes OCR distortions like 139702... -> JF39E...
-          foundEngine = nextM[1].replace(/^139/, 'JF39');
-          break;
+        if (!nextL.includes('VEHICLE') && !nextL.includes('CLASS') && !nextL.includes('ADDRESS') && !nextL.includes('MAKER')) {
+          const nextTokens = nextL.split(/[\s,;:|/]+/);
+          for (const t of nextTokens) {
+            const candidate = t.replace(/[^A-Z0-9-]/g, '');
+            if (candidate.length >= 6 && candidate.length <= 18 && !engineBlacklist.has(candidate) && /[0-9]/.test(candidate)) {
+              foundEngine = candidate;
+              break;
+            }
+          }
         }
       }
+      if (foundEngine) break;
     }
   }
+
+  // Direct regex fallback across full cleanText
+  if (!foundEngine) {
+    const directMatch = cleanText.match(/(?:ENGINE|MOTOR|ENG)\s*(?:NO|NUM|NUMBER|\.)*(?:\s*\/\s*MOTOR\s*(?:NO|NUM|NUMBER|\.)*)?[\s:.-]*([A-Z0-9-]{6,18})/);
+    if (directMatch && directMatch[1] && !engineBlacklist.has(directMatch[1]) && /[0-9]/.test(directMatch[1])) {
+      foundEngine = directMatch[1];
+    }
+  }
+
   if (foundEngine) {
     result.engineNumber = foundEngine;
     detectedFieldsList.push('Engine Number');
@@ -435,55 +460,87 @@ export function parseRcText(rawText: string): ExtractedRcData {
     detectedFieldsList.push('Cylinders');
   }
 
-  // 13. Manufacturing Month & Year
-  if (cleanText.includes('1-2015') || (cleanText.includes('2015') && cleanText.includes('DIO'))) {
-    result.manufacturingYear = 2015;
-    result.manufacturingMonthYear = 'January 2015 (1-2015)';
-    detectedFieldsList.push('Mfg Month/Year');
-  } else {
-    const mfgMatch = cleanText.match(/(?:MFG|MFD|YEAR\s*OF\s*MFG|M\.YEAR)[\s:.-]*([0-1]?[0-9][\/-])?([12][09][0-9]{2})/i);
-    if (mfgMatch && mfgMatch[2]) {
-      const yr = parseInt(mfgMatch[2], 10);
-      if (yr >= 1995 && yr <= 2030) {
-        result.manufacturingYear = yr;
-        detectedFieldsList.push('Manufacturing Year');
+  // 14. Registration Date & Fitness Validity (Regn. Validity)
+  // Check explicit Kerala / Indian RC labels first (e.g. Date of Regn / Regn. Validity)
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].toUpperCase();
+
+    // Date of Registration
+    if (!result.registrationDate && (l.includes('DATE OF REG') || l.includes('REGN DATE') || l.includes('REG. DATE') || l.includes('DT OF REG') || l.includes('REGISTRATION DATE') || l.includes('DATE OF ISSUE') || l.includes('REGN. DATE'))) {
+      const match = l.match(/\b([0-3]?[0-9][\/. -](?:[0-1]?[0-9]|[A-Z]{3,9})[\/. -](?:19|20)[0-9]{2})\b/);
+      if (match) {
+        const norm = normalizeDate(match[1]);
+        if (norm) {
+          result.registrationDate = norm;
+          detectedFieldsList.push('Registration Date');
+        }
+      } else if (i + 1 < lines.length) {
+        const nextMatch = lines[i + 1].match(/\b([0-3]?[0-9][\/. -](?:[0-1]?[0-9]|[A-Z]{3,9})[\/. -](?:19|20)[0-9]{2})\b/);
+        if (nextMatch) {
+          const norm = normalizeDate(nextMatch[1]);
+          if (norm) {
+            result.registrationDate = norm;
+            detectedFieldsList.push('Registration Date');
+          }
+        }
+      }
+    }
+
+    // Fitness / Regn Validity Expiry Date
+    if (!result.registrationValidity && (l.includes('REGN. VALIDITY') || l.includes('REGN VALIDITY') || l.includes('REG. VALIDITY') || l.includes('FITNESS') || l.includes('VALID UPTO') || l.includes('VALID UNTIL') || l.includes('RC EXPIRY'))) {
+      const match = l.match(/\b([0-3]?[0-9][\/. -](?:[0-1]?[0-9]|[A-Z]{3,9})[\/. -](?:19|20)[0-9]{2})\b/);
+      if (match) {
+        const norm = normalizeDate(match[1]);
+        if (norm) {
+          result.registrationValidity = norm;
+          detectedFieldsList.push('Registration Validity');
+        }
+      } else if (i + 1 < lines.length) {
+        const nextMatch = lines[i + 1].match(/\b([0-3]?[0-9][\/. -](?:[0-1]?[0-9]|[A-Z]{3,9})[\/. -](?:19|20)[0-9]{2})\b/);
+        if (nextMatch) {
+          const norm = normalizeDate(nextMatch[1]);
+          if (norm) {
+            result.registrationValidity = norm;
+            detectedFieldsList.push('Registration Validity');
+          }
+        }
       }
     }
   }
 
-  // 14. Registration Date & Validity
-  const allDates = cleanText.match(/\b([0-3]?[0-9][\/-](?:[0-1]?[0-9]|[A-Z]{3,4})[\/-](?:19|20)[0-9]{2})\b/g);
-  if (allDates && allDates.length >= 2) {
-    const d1 = normalizeDate(allDates[0]);
-    const d2 = normalizeDate(allDates[1]);
-    if (d1 && d2) {
-      if (d1 < d2) {
-        result.registrationDate = d1;
-        result.registrationValidity = d2;
-      } else {
-        result.registrationDate = d2;
-        result.registrationValidity = d1;
+  // Fallback: search for all valid dates in document
+  if (!result.registrationDate || !result.registrationValidity) {
+    const allDates = cleanText.match(/\b([0-3]?[0-9][\/. -](?:[0-1]?[0-9]|[A-Z]{3,9})[\/. -](?:19|20)[0-9]{2})\b/g);
+    if (allDates && allDates.length >= 2) {
+      const parsedDates = allDates
+        .map((d) => normalizeDate(d))
+        .filter((d): d is string => Boolean(d))
+        .sort();
+
+      if (parsedDates.length >= 2) {
+        if (!result.registrationDate) {
+          result.registrationDate = parsedDates[0];
+          detectedFieldsList.push('Registration Date');
+        }
+        if (!result.registrationValidity) {
+          result.registrationValidity = parsedDates[parsedDates.length - 1];
+          detectedFieldsList.push('Registration Validity');
+        }
       }
-      detectedFieldsList.push('Registration Date');
-      detectedFieldsList.push('Registration Validity');
     }
-  } else if (cleanText.includes('13-FEB-2015') || cleanText.includes('12-FEB-2030') || (cleanText.includes('13') && cleanText.includes('2015') && cleanText.includes('2030'))) {
-    result.registrationDate = '2015-02-13';
-    result.registrationValidity = '2030-02-12';
-    detectedFieldsList.push('Registration Date');
-    detectedFieldsList.push('Registration Validity');
   }
 
   // 14b. Explicit Compliance Dates Extraction (Fitness / Insurance / Pollution)
-  // Handles Parivahan / CarInfo / mParivahan app layouts (e.g. "Fitness upto 25 September 2040")
   const datePattern = '(?:[0-3]?[0-9][\\/-](?:[0-1]?[0-9]|[A-Z]{3,10})[\\/-](?:19|20)[0-9]{2}|[0-3]?[0-9]\\s+[A-Za-z]{3,10}\\s+(?:19|20)[0-9]{2})';
 
-  const fitMatch = cleanText.match(new RegExp(`(?:FITNESS\\s*(?:UPTO|VALIDITY|EXPIRY)?|RC\\s*EXPIRY[\\s*DATE]?)[\\s:.-]*(${datePattern})`, 'i'));
-  if (fitMatch && fitMatch[1]) {
-    const fDate = normalizeDate(fitMatch[1]);
-    if (fDate) {
-      result.registrationValidity = fDate;
-      detectedFieldsList.push('Fitness Validity (25-09-2040)');
+  if (!result.registrationValidity) {
+    const fitMatch = cleanText.match(new RegExp(`(?:FITNESS\\s*(?:UPTO|VALIDITY|EXPIRY)?|RC\\s*EXPIRY[\\s*DATE]?)[\\s:.-]*(${datePattern})`, 'i'));
+    if (fitMatch && fitMatch[1]) {
+      const fDate = normalizeDate(fitMatch[1]);
+      if (fDate) {
+        result.registrationValidity = fDate;
+        detectedFieldsList.push('Registration Validity');
+      }
     }
   }
 
@@ -494,6 +551,111 @@ export function parseRcText(rawText: string): ExtractedRcData {
       result.insuranceValidity = iDate;
       detectedFieldsList.push('Insurance Validity');
     }
+  }
+
+  // 14c. Manufacturing Month & Year (Accurate Detection + ISO 3779 VIN Verification)
+  const VIN_YEAR_TABLE: Record<string, number> = {
+    'A': 2010, 'B': 2011, 'C': 2012, 'D': 2013, 'E': 2014,
+    'F': 2015, 'G': 2016, 'H': 2017, 'J': 2018, 'K': 2019,
+    'L': 2020, 'M': 2021, 'N': 2022, 'P': 2023, 'R': 2024,
+    'S': 2025, 'T': 2026, 'V': 2027, 'W': 2028, 'X': 2029, 'Y': 2030,
+    '1': 2001, '2': 2002, '3': 2003, '4': 2004, '5': 2005,
+    '6': 2006, '7': 2007, '8': 2008, '9': 2009
+  };
+
+  let vinModelYear: number | undefined;
+  if (result.chassisNumber && result.chassisNumber.length === 17) {
+    const code = result.chassisNumber.charAt(9).toUpperCase();
+    if (VIN_YEAR_TABLE[code]) {
+      vinModelYear = VIN_YEAR_TABLE[code];
+    }
+  }
+
+  // Look for explicit labels: MTH. YR. OF MFG, MONTH & YEAR OF MFG, MFG. DT, MFG. DATE, YEAR OF MFG, etc.
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].toUpperCase();
+    if (
+      l.includes('MFG') ||
+      l.includes('MANUFACTUR') ||
+      (l.includes('MTH') && (l.includes('YR') || l.includes('YEAR'))) ||
+      l.includes('YEAR OF') ||
+      l.includes('M.YEAR') ||
+      l.includes('MFD')
+    ) {
+      // 1. Check for MM/YYYY, MM-YYYY, MM / YYYY (e.g. 08/2022, 09 / 2025)
+      const mMatch = l.match(/(?:^|[^0-9])(0?[1-9]|1[0-2])\s*[\/.-]\s*((?:19|20)\d{2})(?:[^0-9]|$)/);
+      if (mMatch) {
+        const mm = mMatch[1].padStart(2, '0');
+        const yy = parseInt(mMatch[2], 10);
+        result.manufacturingMonthYear = `${mm}/${yy}`;
+        result.manufacturingYear = yy;
+        detectedFieldsList.push('Mfg. Date / Year');
+        break;
+      }
+
+      // 2. Check for Month Name + Year (e.g. AUG 2022, SEPTEMBER 2025)
+      const textMonthMatch = l.match(/\b(JAN(?:UARY)?|FEB(?:RUARY)?|MAR(?:CH)?|APR(?:IL)?|MAY|JUN(?:E)?|JUL(?:Y)?|AUG(?:UST)?|SEP(?:TEMBER)?|OCT(?:OBER)?|NOV(?:EMBER)?|DEC(?:EMBER)?)\b[,\s]*((?:19|20)\d{2})/);
+      if (textMonthMatch) {
+        const monStr = textMonthMatch[1].slice(0, 3);
+        const mm = MONTH_NAMES[monStr] || '01';
+        const yy = parseInt(textMonthMatch[2], 10);
+        result.manufacturingMonthYear = `${mm}/${yy}`;
+        result.manufacturingYear = yy;
+        detectedFieldsList.push('Mfg. Date / Year');
+        break;
+      }
+
+      // 3. Check for 4-digit Year only on this line (e.g. "MFG: 2022")
+      const yMatch = l.match(/\b((?:19|20)\d{2})\b/);
+      if (yMatch) {
+        const yy = parseInt(yMatch[1], 10);
+        result.manufacturingMonthYear = String(yy);
+        result.manufacturingYear = yy;
+        detectedFieldsList.push('Mfg. Date / Year');
+        break;
+      }
+
+      // 4. Check on the next line (often values in table layout are on the line below the header)
+      if (i + 1 < lines.length) {
+        const nextL = lines[i + 1].toUpperCase().trim();
+        const nextMMatch = nextL.match(/(?:^|[^0-9])(0?[1-9]|1[0-2])\s*[\/.-]\s*((?:19|20)\d{2})(?:[^0-9]|$)/);
+        if (nextMMatch) {
+          const mm = nextMMatch[1].padStart(2, '0');
+          const yy = parseInt(nextMMatch[2], 10);
+          result.manufacturingMonthYear = `${mm}/${yy}`;
+          result.manufacturingYear = yy;
+          detectedFieldsList.push('Mfg. Date / Year');
+          break;
+        }
+
+        const nextTextMonth = nextL.match(/\b(JAN(?:UARY)?|FEB(?:RUARY)?|MAR(?:CH)?|APR(?:IL)?|MAY|JUN(?:E)?|JUL(?:Y)?|AUG(?:UST)?|SEP(?:TEMBER)?|OCT(?:OBER)?|NOV(?:EMBER)?|DEC(?:EMBER)?)\b[,\s]*((?:19|20)\d{2})/);
+        if (nextTextMonth) {
+          const monStr = nextTextMonth[1].slice(0, 3);
+          const mm = MONTH_NAMES[monStr] || '01';
+          const yy = parseInt(nextTextMonth[2], 10);
+          result.manufacturingMonthYear = `${mm}/${yy}`;
+          result.manufacturingYear = yy;
+          detectedFieldsList.push('Mfg. Date / Year');
+          break;
+        }
+
+        const nextYMatch = nextL.match(/\b((?:19|20)\d{2})\b/);
+        if (nextYMatch && !nextL.includes('VALID') && !nextL.includes('REG')) {
+          const yy = parseInt(nextYMatch[1], 10);
+          result.manufacturingMonthYear = String(yy);
+          result.manufacturingYear = yy;
+          detectedFieldsList.push('Mfg. Date / Year');
+          break;
+        }
+      }
+    }
+  }
+
+  // If text OCR missed it, but VIN Chassis 10th digit gave the exact model year:
+  if (!result.manufacturingYear && vinModelYear) {
+    result.manufacturingYear = vinModelYear;
+    result.manufacturingMonthYear = String(vinModelYear);
+    detectedFieldsList.push('Mfg. Date / Year');
   }
 
   const pucMatch = cleanText.match(new RegExp(`(?:POLLUTION\\s*(?:VALIDITY|UPTO|EXPIRY)?(?:\\s*\\([A-Z0-9]+\\))?|PUCC)[\\s:.-]*(${datePattern})`, 'i'));
@@ -517,33 +679,63 @@ export function parseRcText(rawText: string): ExtractedRcData {
     }
   }
 
+  // Auto-resolve RTO Office from Kerala registration number code (e.g. KL-53 -> KL-53 Perinthalmanna SRTO)
+  if (!result.rto && result.registrationNumber) {
+    const rtoCodeMatch = result.registrationNumber.match(/^([A-Z]{2})[- ]?([0-9]{2})/);
+    if (rtoCodeMatch) {
+      const codeKey = `${rtoCodeMatch[1]}${rtoCodeMatch[2]}`.toUpperCase();
+      if (KERALA_RTO_MAP[codeKey]) {
+        result.rto = KERALA_RTO_MAP[codeKey];
+        detectedFieldsList.push('Registration Authority');
+      }
+    }
+  }
+
   // 16. Owner Serial
   if (cleanText.includes('SERIAL') || cleanText.includes('(1)')) {
     result.ownerSerial = 1;
     detectedFieldsList.push('Owner Serial');
   }
 
-  // 17. Owner Name (Supports label on line i, name on line i+1, and direct keyword match)
+  // 17. Owner Name (Customer / Owner on Kerala RC or smart card)
+  const nameBlacklist = new Set([
+    'VEHICLE', 'CLASS', 'MAKER', 'MODEL', 'ADDRESS', 'CHASSIS', 'ENGINE', 'MOTOR',
+    'KERALA', 'INDIA', 'GOVERNMENT', 'REGISTRATION', 'CERTIFICATE', 'UNION', 'PETROL',
+    'DIESEL', 'SERIAL', 'DATE', 'VALIDITY', 'FITNESS', 'INSURANCE', 'POLLUTION', 'PRESENT'
+  ]);
+
   if (cleanText.includes('VINU ALEX') || cleanText.includes('VING ALEX')) {
     result.ownerName = 'VINU ALEX';
     detectedFieldsList.push('Owner Name');
   } else {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].toUpperCase();
-      if ((line.includes('OWNER NAME') || line.includes('REGD OWNER')) && !line.includes('FATHER')) {
-        const parts = lines[i].split(/[:–-]/);
-        if (parts.length > 1 && parts[1].trim().length > 2 && !parts[1].trim().startsWith('8')) {
-          result.ownerName = parts[1].trim().replace(/^(?:MR|MRS|SRI|SMT)\.?\s+/i, '');
+      if ((line.includes('REGD OWNER') || line.includes('OWNER NAME') || line.includes('NAME OF OWNER') || line.includes('REGD. OWNER')) && !line.includes('FATHER')) {
+        // Same line extraction:
+        let afterLabel = line.replace(/.*(?:REGD\.?\s*OWNER|OWNER\s*NAME|NAME\s*OF\s*OWNER)[\s:.-]*/i, '').trim();
+        // Cut off if subsequent labels appear on the same line (like "SON OF", "S/D/W", "PRESENT ADDRESS", "SERIAL")
+        afterLabel = afterLabel.replace(/\s*(?:SON|WIFE|DAUGHTER|S\/D\/W|S\/O|W\/O|D\/O|PRESENT|ADDRESS|PERMANENT|SERIAL|CHASSIS|ENG|VEHICLE).*/i, '').trim();
+        afterLabel = afterLabel.replace(/^(?:MR|MRS|SRI|SMT|DR)\.?\s+/i, '').replace(/[^A-Za-z.\s]/g, '').trim();
+
+        if (afterLabel.length >= 3 && !nameBlacklist.has(afterLabel)) {
+          result.ownerName = afterLabel;
           detectedFieldsList.push('Owner Name');
           break;
         }
+
+        // If not found on same line, check next line
         if (i + 1 < lines.length) {
-          const nextLine = lines[i + 1].trim();
-          const nameMatch = nextLine.match(/\b([A-Za-z]{3,15}\s+[A-Za-z]{3,15})\b/);
-          if (nameMatch && !nameMatch[1].toUpperCase().includes('FUEL') && !nameMatch[1].toUpperCase().includes('SON')) {
-            result.ownerName = nameMatch[1].replace(/\bVING\b/i, 'VINU').toUpperCase();
-            detectedFieldsList.push('Owner Name');
-            break;
+          const nextL = lines[i + 1].trim();
+          const nextUpper = nextL.toUpperCase();
+          if (!nextUpper.includes('SON') && !nextUpper.includes('WIFE') && !nextUpper.includes('DAUGHTER') &&
+              !nextUpper.includes('ADDRESS') && !nextUpper.includes('CHASSIS') && !nextUpper.includes('SERIAL') &&
+              !nextUpper.includes('REGN') && !nextUpper.includes('MOTOR') && !nextUpper.includes('CLASS')) {
+            const cleanedName = nextL.replace(/^(?:MR|MRS|SRI|SMT|DR)\.?\s+/i, '').replace(/[^A-Za-z.\s]/g, '').trim();
+            if (cleanedName.length >= 3 && cleanedName.split(/\s+/).length <= 4) {
+              result.ownerName = cleanedName.toUpperCase();
+              detectedFieldsList.push('Owner Name');
+              break;
+            }
           }
         }
       }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useApp } from '@/lib/store/app-context';
 import { Button } from '@/components/ui/button';
@@ -32,10 +32,14 @@ import {
   Shield,
   ShieldAlert,
   Download,
+  Upload,
   ExternalLink,
   History,
   CheckSquare,
   Trash2,
+  Flame,
+  RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -53,6 +57,7 @@ export default function VehicleDetailPage() {
     activityLogs,
     users,
     currentUser,
+    addDocument,
     updateTask,
     completeTask,
     deleteVehicle,
@@ -69,6 +74,7 @@ export default function VehicleDetailPage() {
   const [editingDoc, setEditingDoc] = useState<VehicleDocument | null>(null);
   const [docToDelete, setDocToDelete] = useState<VehicleDocument | null>(null);
   const [completionDoc, setCompletionDoc] = useState<VehicleDocument | null>(null);
+  const [completionTaskId, setCompletionTaskId] = useState<string | undefined>(undefined);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [taskToDelete, setTaskToDelete] = useState<any>(null);
@@ -126,6 +132,34 @@ export default function VehicleDetailPage() {
   const vehicleDocs = documents.filter((d) => d.vehicleId === vehicle.id);
   const activeDocs = vehicleDocs.filter((d) => !d.isHistorical);
   const historicalDocs = vehicleDocs.filter((d) => d.isHistorical);
+
+  // Automatically ensure all 4 core periodic compliances (Fitness, Insurance, Road Tax, PUC) exist for this vehicle
+  useEffect(() => {
+    if (!vehicle) return;
+    const coreTypes: Array<'FITNESS' | 'INSURANCE' | 'ROAD_TAX' | 'PUC'> = [
+      'FITNESS',
+      'INSURANCE',
+      'ROAD_TAX',
+      'PUC',
+    ];
+    const existingTypes = new Set(activeDocs.map((d) => d.documentType));
+
+    coreTypes.forEach((docType) => {
+      if (!existingTypes.has(docType)) {
+        addDocument({
+          vehicleId: vehicle.id,
+          clientId: vehicle.clientId,
+          documentType: docType,
+          expiryDate:
+            docType === 'FITNESS' && vehicle.registrationValidity
+              ? vehicle.registrationValidity
+              : undefined,
+          reminderDays: docType === 'PUC' ? 15 : 30,
+          notes: `${getDocumentTypeName(docType)} compliance`,
+        });
+      }
+    });
+  }, [vehicle?.id, activeDocs.length]);
 
   // Associated tasks for this vehicle
   const vehicleTasks = tasks.filter((t) => t.vehicleId === vehicle.id);
@@ -211,7 +245,8 @@ export default function VehicleDetailPage() {
         </div>
 
         {/* Top Actions */}
-        <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+        {/* Top Actions (Icon Only) */}
+        <div className="flex items-center gap-2 self-start md:self-auto">
           {client && (
             <Button
               variant="outline"
@@ -222,10 +257,11 @@ export default function VehicleDetailPage() {
                   documentType: 'Upcoming Renewal',
                 })
               }
-              className="text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50 gap-1.5"
+              className="h-9 w-9 p-0 rounded-xl text-emerald-600 border-emerald-200 hover:bg-emerald-50 transition-colors"
+              title="WhatsApp Client"
+              aria-label="WhatsApp Client"
             >
-              <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600" />
-              WhatsApp Client
+              <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
             </Button>
           )}
 
@@ -233,10 +269,11 @@ export default function VehicleDetailPage() {
             variant="outline"
             size="sm"
             onClick={() => setIsEditVehicleModalOpen(true)}
-            className="text-xs gap-1.5"
+            className="h-9 w-9 p-0 rounded-xl text-slate-700 border-slate-200 hover:bg-slate-50 transition-colors"
+            title="Edit Vehicle Info"
+            aria-label="Edit Vehicle Info"
           >
-            <Edit className="w-3.5 h-3.5" />
-            Edit Info
+            <Edit className="w-4 h-4" />
           </Button>
 
           {currentUser?.role === 'ADMIN' && (
@@ -244,10 +281,11 @@ export default function VehicleDetailPage() {
               variant="outline"
               size="sm"
               onClick={() => setIsDeleteVehicleModalOpen(true)}
-              className="text-xs text-rose-600 border-rose-200 hover:bg-rose-50 gap-1.5"
+              className="h-9 w-9 p-0 rounded-xl text-rose-600 border-rose-200 hover:bg-rose-50 transition-colors"
+              title="Delete Vehicle"
+              aria-label="Delete Vehicle"
             >
-              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-              Delete Vehicle
+              <Trash2 className="w-4 h-4 text-rose-600" />
             </Button>
           )}
 
@@ -255,10 +293,11 @@ export default function VehicleDetailPage() {
             variant="primary"
             size="sm"
             onClick={() => setIsAddDocModalOpen(true)}
-            className="text-xs gap-1.5 font-semibold"
+            className="h-9 w-9 p-0 rounded-xl transition-colors shadow-xs"
+            title="Add Compliance Document"
+            aria-label="Add Compliance Document"
           >
-            <Plus className="w-3.5 h-3.5" />
-            Add Document
+            <Plus className="w-4 h-4" />
           </Button>
         </div>
       </div>
@@ -464,10 +503,8 @@ export default function VehicleDetailPage() {
                   <tr>
                     <th className="px-4 py-3 w-16 text-center font-mono">Sl. No.</th>
                     <th className="px-5 py-3">Document Category</th>
-                    <th className="px-4 py-3">Document / Policy No.</th>
                     <th className="px-4 py-3">Issue / Start Date</th>
                     <th className="px-4 py-3">Expiry / Due Date</th>
-                    <th className="px-4 py-3">Amount</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-5 py-3 text-right">Actions</th>
                   </tr>
@@ -487,6 +524,11 @@ export default function VehicleDetailPage() {
                             </span>
                           )}
                         </div>
+                        {doc.documentNumber && (
+                          <div className="text-[11px] font-mono text-slate-500 font-normal">
+                            Doc No: {doc.documentNumber}
+                          </div>
+                        )}
                         {doc.insuranceProvider && (
                           <div className="text-[11px] text-slate-500 font-normal">
                             {doc.insuranceProvider} ({doc.policyType})
@@ -499,20 +541,12 @@ export default function VehicleDetailPage() {
                         )}
                       </td>
 
-                      <td className="px-4 py-3.5 font-mono text-slate-700">
-                        {doc.documentNumber || '—'}
-                      </td>
-
                       <td className="px-4 py-3.5 text-slate-600 font-mono">
                         {doc.issueDate || doc.startDate || doc.lastPaymentDate || '—'}
                       </td>
 
                       <td className="px-4 py-3.5 font-mono font-bold text-slate-800">
                         {doc.expiryDate || 'Permanent / N/A'}
-                      </td>
-
-                      <td className="px-4 py-3.5 font-semibold text-slate-700">
-                        {formatCurrency(doc.amount)}
                       </td>
 
                       <td className="px-4 py-3.5">
@@ -589,101 +623,268 @@ export default function VehicleDetailPage() {
         </CardContent>
       </Card>
 
-      {/* 4. TASKS SECTION (Follow-ups & Agent Work - Section 17 & 32) */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between py-4 px-5">
+      {/* 4. TASKS SECTION (Follow-ups & Agent Work - Redesigned) */}
+      <Card className="overflow-hidden border border-slate-200/90 shadow-xs">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-4 px-5 bg-slate-50/50 border-b border-slate-100 gap-3">
           <div>
-            <CardTitle className="text-base flex items-center gap-2">
-              <CheckSquare className="w-4 h-4 text-purple-600" />
-              Operational Tasks & Follow-ups
-            </CardTitle>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Track agent communications, documents retrieval, and RTO appointment status.
-            </p>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                <CheckSquare className="w-4 h-4" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span>Operational Tasks &amp; Follow-ups</span>
+                  <div className="flex items-center gap-1.5 ml-1">
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800">
+                      {vehicleTasks.filter((t) => t.status !== 'COMPLETED').length} Pending
+                    </span>
+                    {vehicleTasks.some((t) => t.status === 'COMPLETED') && (
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                        {vehicleTasks.filter((t) => t.status === 'COMPLETED').length} Done
+                      </span>
+                    )}
+                  </div>
+                </CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Automated renewal tracking, agent assignments, and RTO compliance actions.
+                </p>
+              </div>
+            </div>
           </div>
-
           <Button
             size="sm"
-            variant="outline"
             onClick={() => setIsTaskModalOpen(true)}
-            className="text-xs gap-1.5"
+            className="text-xs gap-1.5 self-start sm:self-auto cursor-pointer bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-xs"
           >
-            <Plus className="w-3.5 h-3.5" /> Create Task
+            <Plus className="w-3.5 h-3.5" /> Add Task
           </Button>
         </CardHeader>
 
-        <CardContent className="p-0">
+        <CardContent className="p-4 sm:p-5">
           {vehicleTasks.length === 0 ? (
-            <div className="py-8 text-center text-xs text-slate-500">
-              No active tasks for this vehicle.
+            <div className="py-10 text-center text-xs text-slate-500 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+              <CheckSquare className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="font-semibold text-slate-700">No active tasks for this vehicle</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">All compliances are up-to-date.</p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
               {vehicleTasks.map((task) => {
                 const assignedAgent = users.find((u) => u.id === task.assignedTo);
+                const isCompleted = task.status === 'COMPLETED';
+
+                // Clean title without repeating registration number
+                const cleanTitle = task.title
+                  .replace(new RegExp(`^${vehicle.registrationNumber}\\s*-\\s*`, 'i'), '')
+                  .replace(/^[A-Z0-9\s-]{6,15}\s*-\\s*/i, '')
+                  .trim() || task.title;
+
+                const titleLower = ((task.title || '') + ' ' + (task.description || '')).toLowerCase();
+                let categoryName = 'General Task';
+                let categoryTheme = {
+                  badge: 'bg-purple-50 text-purple-700 border-purple-200/80',
+                  icon: <CheckSquare className="w-3.5 h-3.5 text-purple-600" />,
+                  border: 'border-l-purple-500',
+                };
+
+                if (titleLower.includes('puc') || titleLower.includes('pollution')) {
+                  categoryName = 'Pollution (PUC)';
+                  categoryTheme = {
+                    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+                    icon: <Sparkles className="w-3.5 h-3.5 text-emerald-600" />,
+                    border: 'border-l-emerald-500',
+                  };
+                } else if (titleLower.includes('fitness')) {
+                  categoryName = 'Fitness Certificate';
+                  categoryTheme = {
+                    badge: 'bg-blue-50 text-blue-700 border-blue-200/80',
+                    icon: <FileCheck className="w-3.5 h-3.5 text-blue-600" />,
+                    border: 'border-l-blue-500',
+                  };
+                } else if (titleLower.includes('tax') || titleLower.includes('road_tax')) {
+                  categoryName = 'Road Tax (MVD)';
+                  categoryTheme = {
+                    badge: 'bg-indigo-50 text-indigo-700 border-indigo-200/80',
+                    icon: <RotateCcw className="w-3.5 h-3.5 text-indigo-600" />,
+                    border: 'border-l-indigo-500',
+                  };
+                } else if (titleLower.includes('insurance')) {
+                  categoryName = 'Motor Insurance';
+                  categoryTheme = {
+                    badge: 'bg-amber-50 text-amber-700 border-amber-200/80',
+                    icon: <Shield className="w-3.5 h-3.5 text-amber-600" />,
+                    border: 'border-l-amber-500',
+                  };
+                }
+
+                const handleCompleteTask = () => {
+                  let doc = documents.find((d) => d.id === task.documentId && !d.isHistorical);
+                  let targetType: 'FITNESS' | 'INSURANCE' | 'ROAD_TAX' | 'PUC' | 'PERMIT' | 'RC' | 'OTHER' = 'INSURANCE';
+
+                  if (titleLower.includes('puc') || titleLower.includes('pollution')) {
+                    targetType = 'PUC';
+                  } else if (titleLower.includes('fitness')) {
+                    targetType = 'FITNESS';
+                  } else if (titleLower.includes('tax') || titleLower.includes('road_tax')) {
+                    targetType = 'ROAD_TAX';
+                  } else if (titleLower.includes('permit')) {
+                    targetType = 'PERMIT';
+                  } else if (titleLower.includes('rc')) {
+                    targetType = 'RC';
+                  } else if (titleLower.includes('insurance')) {
+                    targetType = 'INSURANCE';
+                  }
+
+                  if (!doc) {
+                    doc = documents.find((d) => d.vehicleId === vehicle.id && d.documentType === targetType && !d.isHistorical);
+                  }
+
+                  // If still no document exists, provision one so user can set new expiry & upload scan
+                  if (!doc) {
+                    const newDocId = `doc_${Date.now()}`;
+                    const createdDoc: VehicleDocument = {
+                      id: newDocId,
+                      vehicleId: vehicle.id,
+                      clientId: vehicle.clientId,
+                      documentType: targetType,
+                      documentNumber: '',
+                      expiryDate: task.dueDate || new Date().toISOString().split('T')[0],
+                      reminderDays: 30,
+                      status: 'OVERDUE',
+                      isHistorical: false,
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                      createdBy: currentUser?.id || 'system',
+                    };
+                    addDocument(createdDoc);
+                    doc = createdDoc;
+                  }
+
+                  setCompletionTaskId(task.id);
+                  setCompletionDoc(doc);
+                };
+
                 return (
                   <div
                     key={task.id}
-                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/80 transition-colors"
+                    className={`rounded-2xl border transition-all flex flex-col justify-between bg-white shadow-xs hover:shadow-md p-4 space-y-3.5 border-l-4 ${
+                      isCompleted
+                        ? 'border-slate-200/90 border-l-emerald-500 bg-gradient-to-b from-white to-emerald-50/15'
+                        : `border-slate-200/90 ${categoryTheme.border}`
+                    }`}
                   >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-slate-900">{task.title}</span>
-                        <PriorityBadge priority={task.priority} />
-                        <TaskStatusBadge status={task.status} />
+                    <div className="space-y-3">
+                      {/* Top Row: Category Pill & Status Badges */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${categoryTheme.badge}`}>
+                          {categoryTheme.icon}
+                          <span>{categoryName}</span>
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <PriorityBadge priority={task.priority} />
+                          <TaskStatusBadge status={task.status} />
+                        </div>
                       </div>
+
+                      {/* Title */}
+                      <h4 className="font-bold text-sm text-slate-900 leading-snug tracking-tight" title={cleanTitle}>
+                        {cleanTitle}
+                      </h4>
+
+                      {/* Description */}
                       {task.description && (
-                        <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                          {task.description}
-                        </p>
+                        <div className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-100 text-xs text-slate-600 leading-relaxed font-normal">
+                          <p className="line-clamp-2" title={task.description}>
+                            {task.description}
+                          </p>
+                        </div>
                       )}
-                      <div className="flex items-center gap-4 text-[11px] text-slate-400 mt-1.5">
-                        <span>Assigned to: <strong className="text-slate-700">{assignedAgent?.name || 'Agent'}</strong></span>
-                        <span>Due: <strong className="text-slate-700 font-mono">{task.dueDate}</strong></span>
-                        {task.completionNotes && (
-                          <span className="text-emerald-700 font-medium">
-                            Note: {task.completionNotes}
+
+                      {/* Meta Information Details (2-Column Grid) */}
+                      <div className="grid grid-cols-2 gap-2 bg-slate-50/70 p-2.5 rounded-xl border border-slate-100 text-xs">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">
+                            Assigned Officer
+                          </span>
+                          <span className="font-semibold text-slate-800 text-xs flex items-center gap-1.5 mt-0.5 truncate">
+                            <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate">{assignedAgent?.name?.replace(/\s*\((Agent|Admin)\)/i, '') || 'Staff'}</span>
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">
+                            Due Date
+                          </span>
+                          <span className="font-bold text-slate-800 text-xs font-mono flex items-center gap-1.5 mt-0.5">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>{task.dueDate}</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Completion Notes Banner */}
+                      {task.completionNotes && (
+                        <div className="p-2.5 rounded-xl bg-gradient-to-r from-emerald-50 via-emerald-50/90 to-teal-50/70 border border-emerald-200/90 text-xs flex items-start gap-2 shadow-2xs">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            <span className="font-bold text-emerald-900 text-xs block">
+                              Renewal Completed &amp; Active
+                            </span>
+                            <span className="text-[11px] text-emerald-700 block leading-tight mt-0.5 font-medium line-clamp-2">
+                              {task.completionNotes}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bottom Actions Row */}
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-1">
+                      <div>
+                        {!isCompleted ? (
+                          <Button
+                            size="sm"
+                            onClick={handleCompleteTask}
+                            className="h-8 px-3.5 rounded-xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 font-bold text-xs gap-1.5 shadow-xs cursor-pointer transition-all"
+                            title="Complete Renewal (Set New Expiry & Upload Document)"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Complete Renewal</span>
+                          </Button>
+                        ) : (
+                          <span className="px-3 py-1 rounded-xl text-xs font-bold bg-emerald-100/70 text-emerald-800 border border-emerald-200/80 flex items-center gap-1.5 shadow-2xs">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Done</span>
                           </span>
                         )}
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-1.5 self-start sm:self-auto">
-                      {task.status !== 'COMPLETED' && (
+                      <div className="flex items-center gap-1">
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => completeTask(task.id, 'Task marked completed from workspace')}
-                          className="h-8 w-8 p-0 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
-                          title="Mark Complete"
-                          aria-label="Mark Complete"
+                          onClick={() => setEditingTask(task)}
+                          className="h-8 w-8 p-0 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 border-slate-200 hover:border-blue-200 cursor-pointer transition-colors"
+                          title="Edit Task"
+                          aria-label="Edit Task"
                         >
-                          <CheckCircle2 className="w-4 h-4" />
+                          <Pencil className="w-3.5 h-3.5" />
                         </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setEditingTask(task)}
-                        className="h-8 w-8 p-0 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 border-slate-200"
-                        title="Edit Task"
-                        aria-label="Edit Task"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
 
-                      {currentUser?.role === 'ADMIN' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setTaskToDelete(task)}
-                          className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-slate-200 hover:border-rose-200"
-                          title="Delete Task"
-                          aria-label="Delete Task"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
+                        {currentUser?.role === 'ADMIN' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setTaskToDelete(task)}
+                            className="h-8 w-8 p-0 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border-slate-200 hover:border-rose-200 cursor-pointer transition-colors"
+                            title="Delete Task"
+                            aria-label="Delete Task"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -694,54 +895,129 @@ export default function VehicleDetailPage() {
       </Card>
 
       {/* 5. UPLOADED DOCUMENTS & ATTACHMENTS (Section 41 & 42) */}
-      <Card>
-        <CardHeader className="py-4 px-5">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Download className="w-4 h-4 text-emerald-600" />
-            Uploaded Documents & Digital Scans
-          </CardTitle>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Original policy scans, inspection fitness certificates, and tax receipts.
-          </p>
+      <Card className="overflow-hidden border border-slate-200/90 shadow-xs">
+        <CardHeader className="py-4 px-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-50/50 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                <Download className="w-4 h-4" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span>Uploaded Documents &amp; Digital Scans</span>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                    {vehicleDocs.filter((d) => Boolean(d.fileName || d.fileUrl)).length} Files
+                  </span>
+                </CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Original policy scans, inspection fitness certificates, and tax receipts.
+                </p>
+              </div>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setIsAddDocModalOpen(true)}
+            className="text-xs gap-1.5 self-start sm:self-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs cursor-pointer"
+          >
+            <Upload className="w-3.5 h-3.5" /> Upload Document
+          </Button>
         </CardHeader>
 
-        <CardContent className="p-5">
-          {activeDocs.filter((d) => d.fileName).length === 0 ? (
-            <p className="text-xs text-slate-500 italic">
-              No files attached to current documents. You can upload scans via &ldquo;Add Document&rdquo; or &ldquo;Complete Renewal&rdquo;.
-            </p>
+        <CardContent className="p-4 sm:p-5">
+          {vehicleDocs.filter((d) => Boolean(d.fileName || d.fileUrl)).length === 0 ? (
+            <div className="text-center py-8 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+              <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              <p className="text-xs text-slate-700 font-semibold">No files attached to documents yet.</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Upload renewed policy scans, fitness certificates, and tax receipts directly or when completing a renewal task.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsAddDocModalOpen(true)}
+                className="mt-3 text-xs gap-1.5 rounded-xl cursor-pointer"
+              >
+                <Upload className="w-3.5 h-3.5 text-emerald-600" /> Upload Document Scan
+              </Button>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {activeDocs
-                .filter((d) => d.fileName)
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {vehicleDocs
+                .filter((d) => Boolean(d.fileName || d.fileUrl))
                 .map((d) => (
                   <div
                     key={d.id}
-                    className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 flex items-center justify-between text-xs hover:border-blue-300 transition-colors"
+                    className="p-3.5 rounded-2xl border border-slate-200 bg-white hover:border-emerald-300 hover:shadow-xs transition-all flex flex-col justify-between gap-3"
                   >
-                    <div className="flex items-center gap-2.5 overflow-hidden">
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
-                        <FileText className="w-4 h-4" />
+                    <div className="flex items-start gap-3 overflow-hidden">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                        <FileText className="w-4.5 h-4.5" />
                       </div>
-                      <div className="overflow-hidden">
-                        <div className="font-semibold text-slate-800 truncate">{d.fileName}</div>
-                        <div className="text-[10px] text-slate-400">
-                          {getDocumentTypeName(d.documentType)}
+                      <div className="overflow-hidden min-w-0 flex-1">
+                        <div className="font-bold text-xs text-slate-800 truncate" title={d.fileName || getDocumentTypeName(d.documentType)}>
+                          {d.fileName || `${getDocumentTypeName(d.documentType)} Scan`}
                         </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold text-slate-700">{getDocumentTypeName(d.documentType)}</span>
+                          {d.isHistorical ? (
+                            <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-semibold border border-slate-200">
+                              History
+                            </span>
+                          ) : (
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-semibold">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        {d.expiryDate && (
+                          <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                            Expiry: {d.expiryDate}
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    <a
-                      href={d.fileUrl || '#'}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        alert(`Opening file: ${d.fileName} (${getDocumentTypeName(d.documentType)})`);
-                      }}
-                      className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
-                      title="Download / View document"
-                    >
-                      <Download className="w-4 h-4" />
-                    </a>
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                      <div>
+                        {d.fileUrl ? (
+                          <a
+                            href={d.fileUrl}
+                            download={d.fileName || `${vehicle.registrationNumber}_${d.documentType}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline"
+                            title="Download / View document"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Download</span>
+                          </a>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 italic">No URL</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditingDoc(d)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                          title="Edit Document / Re-upload file"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        {currentUser?.role === 'ADMIN' && (
+                          <button
+                            type="button"
+                            onClick={() => setDocToDelete(d)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Delete Document"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ))}
             </div>
@@ -822,8 +1098,12 @@ export default function VehicleDetailPage() {
       {completionDoc && (
         <CompletionModal
           isOpen={Boolean(completionDoc)}
-          onClose={() => setCompletionDoc(null)}
+          onClose={() => {
+            setCompletionDoc(null);
+            setCompletionTaskId(undefined);
+          }}
           document={completionDoc}
+          linkedTaskId={completionTaskId}
           registrationNumber={vehicle.registrationNumber}
         />
       )}

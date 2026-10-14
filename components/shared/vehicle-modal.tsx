@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { useApp } from '@/lib/store/app-context';
 import { FuelType, Vehicle, VehicleType } from '@/lib/types';
-import { normalizeRegistrationNumber, calculatePaymentBalance, formatCurrency } from '@/lib/utils';
+import { normalizeRegistrationNumber } from '@/lib/utils';
+import { validateMobile, validateEmail, onlyDigits } from '@/lib/validation';
 import {
   performRcOcr,
   ExtractedRcData,
@@ -25,7 +26,6 @@ import {
   Zap,
   FileCheck,
   Flame,
-  Wallet,
   UserCheck,
 } from 'lucide-react';
 
@@ -75,9 +75,7 @@ export function VehicleModal({
   const [pocDesignation, setPocDesignation] = useState('Driver');
   const [hasSeparatePoc, setHasSeparatePoc] = useState(false);
 
-  // Financial Ledger & Advance Payment
-  const [totalCost, setTotalCost] = useState('');
-  const [amountReceived, setAmountReceived] = useState('');
+
 
   // Vehicle essentials
   const [registrationNumber, setRegistrationNumber] = useState('');
@@ -88,18 +86,19 @@ export function VehicleModal({
   const [chassisNumber, setChassisNumber] = useState('');
   const [engineNumber, setEngineNumber] = useState('');
   const [rto, setRto] = useState('');
+  const [registrationDate, setRegistrationDate] = useState('');
+  const [manufacturingMonthYear, setManufacturingMonthYear] = useState('');
   const [assignedAgentId, setAssignedAgentId] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Core 3 Compliances (Essential for Consultancy Operations)
+  // Core 4 Periodic Compliances (Expiry Dates for Automated Renewal Alerts)
   const [insuranceExpiryDate, setInsuranceExpiryDate] = useState('');
+  const [roadTaxExpiryDate, setRoadTaxExpiryDate] = useState('');
+  const [fitnessExpiryDate, setFitnessExpiryDate] = useState('');
+  const [pucExpiryDate, setPucExpiryDate] = useState('');
   const [insurancePolicyNumber, setInsurancePolicyNumber] = useState('');
   const [insuranceProvider, setInsuranceProvider] = useState('');
-
-  const [fitnessExpiryDate, setFitnessExpiryDate] = useState('');
   const [fitnessNumber, setFitnessNumber] = useState('');
-
-  const [pucExpiryDate, setPucExpiryDate] = useState('');
   const [pucNumber, setPucNumber] = useState('');
 
   const [errorMsg, setErrorMsg] = useState('');
@@ -142,6 +141,8 @@ export function VehicleModal({
       setChassisNumber(initialVehicle.chassisNumber || '');
       setEngineNumber(initialVehicle.engineNumber || '');
       setRto(initialVehicle.rto || '');
+      setRegistrationDate(initialVehicle.registrationDate || '');
+      setManufacturingMonthYear(initialVehicle.manufacturingMonthYear || (initialVehicle.manufacturingYear ? String(initialVehicle.manufacturingYear) : ''));
       setAssignedAgentId(initialVehicle.assignedAgentId);
       setNotes(initialVehicle.notes || '');
 
@@ -151,9 +152,7 @@ export function VehicleModal({
       setPocDesignation(initialVehicle.pocDesignation || 'Driver');
       setHasSeparatePoc(Boolean(initialVehicle.pocName || initialVehicle.pocMobile));
 
-      // Load Financial status
-      setTotalCost(initialVehicle.totalCost ? String(initialVehicle.totalCost) : '');
-      setAmountReceived(initialVehicle.amountReceived ? String(initialVehicle.amountReceived) : '');
+
 
       // Load existing active documents
       const activeDocs = documents.filter((d) => d.vehicleId === initialVehicle.id && !d.isHistorical);
@@ -162,6 +161,11 @@ export function VehicleModal({
         setInsuranceExpiryDate(insDoc.expiryDate || '');
         setInsurancePolicyNumber(insDoc.documentNumber || '');
         setInsuranceProvider(insDoc.insuranceProvider || '');
+      }
+
+      const taxDoc = activeDocs.find((d) => d.documentType === 'ROAD_TAX');
+      if (taxDoc) {
+        setRoadTaxExpiryDate(taxDoc.expiryDate || '');
       }
 
       const fitDoc = activeDocs.find((d) => d.documentType === 'FITNESS');
@@ -214,12 +218,13 @@ export function VehicleModal({
       setPocMobile('');
       setPocDesignation('Driver');
       setHasSeparatePoc(false);
-      setTotalCost('');
-      setAmountReceived('');
 
+      setRegistrationDate('');
+      setManufacturingMonthYear('');
       setInsuranceExpiryDate('');
       setInsurancePolicyNumber('');
       setInsuranceProvider('');
+      setRoadTaxExpiryDate('');
       setFitnessExpiryDate('');
       setFitnessNumber('');
       setPucExpiryDate('');
@@ -288,10 +293,16 @@ export function VehicleModal({
     if (data.chassisNumber) setChassisNumber(data.chassisNumber);
     if (data.engineNumber) setEngineNumber(data.engineNumber);
     if (data.rto) setRto(data.rto);
+    if (data.registrationDate) setRegistrationDate(data.registrationDate);
+    if (data.manufacturingMonthYear) setManufacturingMonthYear(data.manufacturingMonthYear);
+    else if (data.manufacturingYear) setManufacturingMonthYear(String(data.manufacturingYear));
     if (data.registrationValidity) setFitnessExpiryDate(data.registrationValidity);
     if (data.insuranceValidity) setInsuranceExpiryDate(data.insuranceValidity);
     if (data.pollutionValidity) setPucExpiryDate(data.pollutionValidity);
-    if (data.ownerName) setClientName(data.ownerName);
+    if (data.ownerName) {
+      setClientName(data.ownerName);
+      setClientMode('AUTO_LOOKUP');
+    }
 
     setSuccessNotice(`Verified RC details applied successfully!`);
     setActiveTab('FORM');
@@ -347,25 +358,35 @@ export function VehicleModal({
       if (clientMode === 'SELECT_EXISTING' && selectedExistingClientId) {
         finalClientId = selectedExistingClientId;
       } else {
-        if (!clientMobile.trim() || clientMobile.trim().length < 6) {
-          setErrorMsg('Please provide a valid client mobile number.');
+        const mobileCheck = validateMobile(clientMobile, 'Client Mobile Number', true);
+        if (!mobileCheck.isValid) {
+          setErrorMsg(mobileCheck.error || 'Please provide a valid 10-digit client mobile number.');
           setIsSubmitting(false);
           return;
         }
 
-        if (!clientName.trim()) {
-          setErrorMsg('Please enter the client / vehicle owner name.');
+        if (!clientName.trim() || clientName.trim().length < 2) {
+          setErrorMsg('Please enter a valid client / vehicle owner name (at least 2 characters).');
           setIsSubmitting(false);
           return;
+        }
+
+        if (clientEmail.trim()) {
+          const emailCheck = validateEmail(clientEmail, false);
+          if (!emailCheck.isValid) {
+            setErrorMsg(emailCheck.error || 'Please enter a valid email address.');
+            setIsSubmitting(false);
+            return;
+          }
         }
 
         if (matchedExistingClient) {
           finalClientId = matchedExistingClient.id;
           if (clientEmail && clientEmail !== matchedExistingClient.email) {
-            await updateClient(matchedExistingClient.id, { email: clientEmail.trim() });
+            await updateClient(matchedExistingClient.id, { email: clientEmail.trim().toLowerCase() });
           }
         } else {
-          const cleaned = cleanPhone(clientMobile);
+          const cleaned = mobileCheck.cleaned;
           const found = clients.find((c) => cleanPhone(c.mobile) === cleaned);
 
           if (found) {
@@ -373,9 +394,9 @@ export function VehicleModal({
           } else {
             const newClientId = await addClient({
               name: clientName.trim(),
-              mobile: clientMobile.trim(),
+              mobile: cleaned,
               address: 'Address not specified',
-              email: clientEmail.trim() || undefined,
+              email: clientEmail.trim().toLowerCase() || undefined,
               assignedAgentId: assignedAgentId || currentUser?.id || 'agent',
               status: 'ACTIVE',
               notes: `Auto-created during registration of vehicle ${registrationNumber.toUpperCase()}`,
@@ -391,10 +412,15 @@ export function VehicleModal({
         return;
       }
 
-      const balanceSummary = calculatePaymentBalance(
-        totalCost ? Number(totalCost) : 0,
-        amountReceived ? Number(amountReceived) : 0
-      );
+      // Validate POC Mobile if provided
+      if (hasSeparatePoc && pocMobile.trim()) {
+        const pocCheck = validateMobile(pocMobile, 'POC Mobile Number', false);
+        if (!pocCheck.isValid) {
+          setErrorMsg(pocCheck.error || 'Invalid POC mobile number.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
 
       const vehiclePayload = {
         clientId: finalClientId,
@@ -406,6 +432,11 @@ export function VehicleModal({
         chassisNumber: chassisNumber.trim() || undefined,
         engineNumber: engineNumber.trim() || undefined,
         rto: rto.trim(),
+        registrationDate: registrationDate || undefined,
+        manufacturingMonthYear: manufacturingMonthYear.trim() || undefined,
+        manufacturingYear: manufacturingMonthYear.match(/\b((?:19|20)\d{2})\b/)
+          ? parseInt(manufacturingMonthYear.match(/\b((?:19|20)\d{2})\b/)![1], 10)
+          : undefined,
         registrationValidity: fitnessExpiryDate || undefined,
         assignedAgentId: assignedAgentId || currentUser?.id || 'agent',
         status: 'ACTIVE' as const,
@@ -414,11 +445,6 @@ export function VehicleModal({
         pocName: hasSeparatePoc && pocName.trim() ? pocName.trim() : undefined,
         pocMobile: hasSeparatePoc && pocMobile.trim() ? pocMobile.trim() : undefined,
         pocDesignation: hasSeparatePoc && pocName.trim() ? pocDesignation : undefined,
-        // Financial Ledger & Billing Status
-        totalCost: totalCost ? Number(totalCost) : undefined,
-        amountReceived: amountReceived ? Number(amountReceived) : undefined,
-        balanceAmount: (totalCost || amountReceived) ? balanceSummary.balanceAmount : undefined,
-        paymentStatus: (totalCost || amountReceived) ? balanceSummary.paymentStatus : undefined,
       };
 
       let vehicleId = initialVehicle?.id;
@@ -428,73 +454,76 @@ export function VehicleModal({
         vehicleId = await addVehicle(vehiclePayload);
       }
 
-      // Automatically Create / Sync the Core 3 Compliance Documents
+      // Automatically Create / Sync the Core 4 Compliance Documents for every vehicle
       if (vehicleId) {
         const activeDocs = documents.filter((d) => d.vehicleId === vehicleId && !d.isHistorical);
 
-        // 1. Insurance Document
-        if (insuranceExpiryDate) {
-          const existingIns = activeDocs.find((d) => d.documentType === 'INSURANCE');
-          if (existingIns) {
-            await updateDocument(existingIns.id, {
-              expiryDate: insuranceExpiryDate,
-              documentNumber: insurancePolicyNumber || existingIns.documentNumber,
-              insuranceProvider: insuranceProvider || existingIns.insuranceProvider,
-            });
-          } else {
-            await addDocument({
-              vehicleId,
-              clientId: finalClientId,
-              documentType: 'INSURANCE',
-              expiryDate: insuranceExpiryDate,
-              documentNumber: insurancePolicyNumber || undefined,
-              insuranceProvider: insuranceProvider || undefined,
-              reminderDays: 30,
-              notes: 'Recorded during vehicle registration',
-            });
+        // 1. Fitness Document
+        const existingFit = activeDocs.find((d) => d.documentType === 'FITNESS');
+        if (existingFit) {
+          if (fitnessExpiryDate) {
+            await updateDocument(existingFit.id, { expiryDate: fitnessExpiryDate });
           }
+        } else {
+          await addDocument({
+            vehicleId,
+            clientId: finalClientId,
+            documentType: 'FITNESS',
+            expiryDate: fitnessExpiryDate || undefined,
+            reminderDays: 30,
+            notes: 'Fitness certificate compliance',
+          });
         }
 
-        // 2. Fitness Document
-        if (fitnessExpiryDate) {
-          const existingFit = activeDocs.find((d) => d.documentType === 'FITNESS');
-          if (existingFit) {
-            await updateDocument(existingFit.id, {
-              expiryDate: fitnessExpiryDate,
-              documentNumber: fitnessNumber || existingFit.documentNumber,
-            });
-          } else {
-            await addDocument({
-              vehicleId,
-              clientId: finalClientId,
-              documentType: 'FITNESS',
-              expiryDate: fitnessExpiryDate,
-              documentNumber: fitnessNumber || undefined,
-              reminderDays: 30,
-              notes: 'Fitness certificate recorded during registration',
-            });
+        // 2. Insurance Document
+        const existingIns = activeDocs.find((d) => d.documentType === 'INSURANCE');
+        if (existingIns) {
+          if (insuranceExpiryDate) {
+            await updateDocument(existingIns.id, { expiryDate: insuranceExpiryDate });
           }
+        } else {
+          await addDocument({
+            vehicleId,
+            clientId: finalClientId,
+            documentType: 'INSURANCE',
+            expiryDate: insuranceExpiryDate || undefined,
+            reminderDays: 30,
+            notes: 'Insurance policy compliance',
+          });
         }
 
-        // 3. Pollution Certificate (PUC / Poka)
-        if (pucExpiryDate) {
-          const existingPuc = activeDocs.find((d) => d.documentType === 'PUC');
-          if (existingPuc) {
-            await updateDocument(existingPuc.id, {
-              expiryDate: pucExpiryDate,
-              documentNumber: pucNumber || existingPuc.documentNumber,
-            });
-          } else {
-            await addDocument({
-              vehicleId,
-              clientId: finalClientId,
-              documentType: 'PUC',
-              expiryDate: pucExpiryDate,
-              documentNumber: pucNumber || undefined,
-              reminderDays: 15,
-              notes: 'Emission compliance (PUC) recorded during registration',
-            });
+        // 3. Road Tax Document
+        const existingTax = activeDocs.find((d) => d.documentType === 'ROAD_TAX');
+        if (existingTax) {
+          if (roadTaxExpiryDate) {
+            await updateDocument(existingTax.id, { expiryDate: roadTaxExpiryDate });
           }
+        } else {
+          await addDocument({
+            vehicleId,
+            clientId: finalClientId,
+            documentType: 'ROAD_TAX',
+            expiryDate: roadTaxExpiryDate || undefined,
+            reminderDays: 30,
+            notes: 'Road tax compliance',
+          });
+        }
+
+        // 4. Pollution Certificate (PUC)
+        const existingPuc = activeDocs.find((d) => d.documentType === 'PUC');
+        if (existingPuc) {
+          if (pucExpiryDate) {
+            await updateDocument(existingPuc.id, { expiryDate: pucExpiryDate });
+          }
+        } else {
+          await addDocument({
+            vehicleId,
+            clientId: finalClientId,
+            documentType: 'PUC',
+            expiryDate: pucExpiryDate || undefined,
+            reminderDays: 15,
+            notes: 'Emission compliance (PUC)',
+          });
         }
       }
 
@@ -655,23 +684,59 @@ export function VehicleModal({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs">
                   {extractedData.registrationNumber && (
                     <div className="p-2 rounded-lg bg-white border border-emerald-100">
                       <span className="text-[10px] text-slate-500 block">Registration</span>
                       <strong className="text-slate-900 font-mono">{extractedData.registrationNumber}</strong>
                     </div>
                   )}
+                  {extractedData.ownerName && (
+                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                      <span className="text-[10px] text-slate-500 block">Customer / Owner Name</span>
+                      <strong className="text-slate-900 truncate block">{extractedData.ownerName}</strong>
+                    </div>
+                  )}
                   {extractedData.make && (
                     <div className="p-2 rounded-lg bg-white border border-emerald-100">
                       <span className="text-[10px] text-slate-500 block">Make &amp; Model</span>
-                      <strong className="text-slate-900">{extractedData.make} {extractedData.model}</strong>
+                      <strong className="text-slate-900 truncate block">{extractedData.make} {extractedData.model}</strong>
                     </div>
                   )}
                   {extractedData.chassisNumber && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-2">
+                    <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-2 md:col-span-1">
                       <span className="text-[10px] text-slate-500 block">Chassis (VIN)</span>
                       <strong className="text-slate-900 font-mono text-[11px] truncate block">{extractedData.chassisNumber}</strong>
+                    </div>
+                  )}
+                  {extractedData.engineNumber && (
+                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                      <span className="text-[10px] text-slate-500 block">Engine Number</span>
+                      <strong className="text-slate-900 font-mono text-[11px] truncate block">{extractedData.engineNumber}</strong>
+                    </div>
+                  )}
+                  {extractedData.registrationDate && (
+                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                      <span className="text-[10px] text-slate-500 block">Date of Regn</span>
+                      <strong className="text-slate-900 font-mono">{extractedData.registrationDate}</strong>
+                    </div>
+                  )}
+                  {extractedData.registrationValidity && (
+                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                      <span className="text-[10px] text-slate-500 block">Fitness Expiry</span>
+                      <strong className="text-emerald-700 font-mono">{extractedData.registrationValidity}</strong>
+                    </div>
+                  )}
+                  {extractedData.fuelType && (
+                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                      <span className="text-[10px] text-slate-500 block">Fuel &amp; Category</span>
+                      <strong className="text-slate-900 truncate block">{extractedData.fuelType} {extractedData.vehicleClass ? `• ${extractedData.vehicleClass}` : ''}</strong>
+                    </div>
+                  )}
+                  {extractedData.rto && (
+                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
+                      <span className="text-[10px] text-slate-500 block">RTO Office</span>
+                      <strong className="text-slate-900 truncate block">{extractedData.rto}</strong>
                     </div>
                   )}
                 </div>
@@ -813,33 +878,20 @@ export function VehicleModal({
                     />
                   </div>
 
-                  {/* RC Expiry / Fitness Validity (Permanent 15-Year Rule for Private) */}
-                  <div className="pt-2 border-t border-slate-100">
-                    <div className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-200/80 space-y-2">
-                      <div className="flex items-center justify-between text-xs font-bold text-emerald-900">
-                        <div className="flex items-center gap-1.5">
-                          <FileCheck className="w-4 h-4 text-emerald-600" />
-                          <span>Fitness / RC Expiry Date</span>
-                        </div>
-                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
-                          Permanent RC Validity (15 Years)
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <Input
-                          label="Fitness Expiry Date"
-                          type="date"
-                          value={fitnessExpiryDate}
-                          onChange={(e) => setFitnessExpiryDate(e.target.value)}
-                        />
-                        <Input
-                          label="Fitness / RC Certificate No."
-                          placeholder="e.g. FC-KL53-2025-8978"
-                          value={fitnessNumber}
-                          onChange={(e) => setFitnessNumber(e.target.value)}
-                        />
-                      </div>
-                    </div>
+                  {/* Registration Date & Mfg. Date / Year */}
+                  <div className="pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input
+                      label="Registration Date (Date of Regn)"
+                      type="date"
+                      value={registrationDate}
+                      onChange={(e) => setRegistrationDate(e.target.value)}
+                    />
+                    <Input
+                      label="Mfg. Date / Year (Month & Year)"
+                      placeholder="e.g. 09/2025 or 2025"
+                      value={manufacturingMonthYear}
+                      onChange={(e) => setManufacturingMonthYear(e.target.value)}
+                    />
                   </div>
                 </div>
 
@@ -900,9 +952,11 @@ export function VehicleModal({
                         <Input
                           label="Client Mobile Number"
                           required
-                          placeholder="e.g. 9846012345"
+                          type="tel"
+                          placeholder="10-digit mobile (e.g. 9846012345)"
                           value={clientMobile}
-                          onChange={(e) => handlePhoneChange(e.target.value)}
+                          onChange={(e) => handlePhoneChange(onlyDigits(e.target.value, 10))}
+                          className="font-mono"
                         />
 
                         <Input
@@ -958,9 +1012,11 @@ export function VehicleModal({
                         />
                         <Input
                           label="POC Mobile"
-                          placeholder="e.g. 9847144556"
+                          type="tel"
+                          placeholder="10-digit mobile"
                           value={pocMobile}
-                          onChange={(e) => setPocMobile(e.target.value)}
+                          onChange={(e) => setPocMobile(onlyDigits(e.target.value, 10))}
+                          className="font-mono"
                         />
                         <Select
                           label="Role"
@@ -983,7 +1039,7 @@ export function VehicleModal({
               {/* RIGHT COLUMN (5 Cols): PERIODIC COMPLIANCES, FEES, AGENT */}
               {/* ======================================================== */}
               <div className="lg:col-span-5 space-y-4">
-                {/* 3. PERIODIC COMPLIANCES (MANUAL ENTRY / RENEWALS) */}
+                {/* 3. PERIODIC COMPLIANCES (EXPIRY DATES ONLY) */}
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/40 via-white to-purple-50/20 border border-indigo-200/80 shadow-2xs space-y-3.5">
                   <div className="flex items-center gap-2 pb-2 border-b border-indigo-100">
                     <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
@@ -991,148 +1047,82 @@ export function VehicleModal({
                     </div>
                     <div>
                       <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                        Periodic Compliances (Manual Entry)
+                        Periodic Compliances (Expiry Dates)
                       </h3>
                       <p className="text-[11px] text-slate-500">
-                        Enter from client copy. Editable anytime for renewal alerts.
+                        Expiry dates for automated renewal reminders &amp; WhatsApp alerts
                       </p>
                     </div>
                   </div>
 
-                  {/* 3.1 Motor Insurance Policy */}
-                  <div className="p-3 rounded-xl bg-white border border-slate-200/90 space-y-2.5">
-                    <div className="flex items-center justify-between text-xs font-bold text-blue-900">
-                      <div className="flex items-center gap-1.5">
-                        <Shield className="w-3.5 h-3.5 text-blue-600" />
-                        <span>1. Motor Insurance Policy</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* 3.1 Motor Insurance Policy */}
+                    <div className="p-3 rounded-xl bg-white border border-slate-200/90 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-bold text-blue-900">
+                        <div className="flex items-center gap-1.5">
+                          <Shield className="w-3.5 h-3.5 text-blue-600" />
+                          <span>1. Motor Insurance</span>
+                        </div>
                       </div>
-                      <span className="text-[10px] text-slate-400 font-normal">Renewable Annual/5-Yr</span>
-                    </div>
-                    <div className="space-y-2">
                       <Input
                         label="Insurance Expiry Date"
                         type="date"
                         value={insuranceExpiryDate}
                         onChange={(e) => setInsuranceExpiryDate(e.target.value)}
                       />
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          label="Policy Number"
-                          placeholder="e.g. HDFC-POL-8978"
-                          value={insurancePolicyNumber}
-                          onChange={(e) => setInsurancePolicyNumber(e.target.value)}
-                        />
-                        <Input
-                          label="Insurance Provider"
-                          placeholder="e.g. HDFC ERGO"
-                          value={insuranceProvider}
-                          onChange={(e) => setInsuranceProvider(e.target.value)}
-                        />
-                      </div>
                     </div>
-                  </div>
 
-                  {/* 3.2 Pollution Certificate (PUC / Poka) */}
-                  <div className="p-3 rounded-xl bg-white border border-slate-200/90 space-y-2.5">
-                    <div className="flex items-center justify-between text-xs font-bold text-amber-900">
-                      <div className="flex items-center gap-1.5">
-                        <Flame className="w-3.5 h-3.5 text-amber-600" />
-                        <span>2. Pollution Certificate (PUC / Poka)</span>
+                    {/* 3.2 Road Tax (State RTO) */}
+                    <div className="p-3 rounded-xl bg-white border border-slate-200/90 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-bold text-purple-900">
+                        <div className="flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5 text-purple-600" />
+                          <span>2. Road Tax (RTO)</span>
+                        </div>
                       </div>
-                      <span className="text-[10px] text-slate-400 font-normal">Annual / 6-Month</span>
+                      <Input
+                        label="Road Tax Expiry Date"
+                        type="date"
+                        value={roadTaxExpiryDate}
+                        onChange={(e) => setRoadTaxExpiryDate(e.target.value)}
+                      />
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+
+                    {/* 3.3 Fitness / RC Expiry */}
+                    <div className="p-3 rounded-xl bg-white border border-slate-200/90 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-bold text-emerald-900">
+                        <div className="flex items-center gap-1.5">
+                          <FileCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>3. Fitness / RC Expiry</span>
+                        </div>
+                      </div>
+                      <Input
+                        label="Fitness Expiry Date"
+                        type="date"
+                        value={fitnessExpiryDate}
+                        onChange={(e) => setFitnessExpiryDate(e.target.value)}
+                      />
+                    </div>
+
+                    {/* 3.4 Pollution Certificate (PUC) */}
+                    <div className="p-3 rounded-xl bg-white border border-slate-200/90 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-bold text-amber-900">
+                        <div className="flex items-center gap-1.5">
+                          <Flame className="w-3.5 h-3.5 text-amber-600" />
+                          <span>4. Pollution (PUC)</span>
+                        </div>
+                      </div>
                       <Input
                         label="PUC Expiry Date"
                         type="date"
                         value={pucExpiryDate}
                         onChange={(e) => setPucExpiryDate(e.target.value)}
                       />
-                      <Input
-                        label="PUC Certificate Number"
-                        placeholder="e.g. PUC-KL53-8978"
-                        value={pucNumber}
-                        onChange={(e) => setPucNumber(e.target.value)}
-                      />
                     </div>
                   </div>
                 </div>
 
-                {/* 4. FINANCIAL LEDGER & ADVANCE BILLING */}
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/40 via-white to-orange-50/20 border border-amber-200/80 shadow-2xs space-y-3">
-                  <div className="flex items-center gap-2 pb-2 border-b border-amber-100">
-                    <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
-                      <Wallet className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                        Financial Status &amp; Advance
-                      </h3>
-                      <p className="text-[11px] text-slate-500">
-                        Tracks fees, advance received, and balances
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <Input
-                      label="Estimated Total Fee (₹)"
-                      type="number"
-                      placeholder="e.g. 5500"
-                      value={totalCost}
-                      onChange={(e) => setTotalCost(e.target.value)}
-                    />
-                    <Input
-                      label="Advance Received (₹)"
-                      type="number"
-                      placeholder="e.g. 2000"
-                      value={amountReceived}
-                      onChange={(e) => setAmountReceived(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Live Balance Banner */}
-                  {Boolean(totalCost || amountReceived) && (() => {
-                    const bal = calculatePaymentBalance(Number(totalCost || 0), Number(amountReceived || 0));
-                    if (bal.paymentStatus === 'REFUND_DUE') {
-                      return (
-                        <div className="p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 flex items-center justify-between text-xs font-semibold animate-in fade-in">
-                          <span className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-purple-600 animate-ping" />
-                            Overpaid:
-                          </span>
-                          <span className="font-extrabold text-purple-700">
-                            Return ₹{bal.balanceAmount.toLocaleString('en-IN')}
-                          </span>
-                        </div>
-                      );
-                    } else if (bal.paymentStatus === 'BALANCE_DUE') {
-                      return (
-                        <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between text-xs font-semibold animate-in fade-in">
-                          <span className="flex items-center gap-1.5">
-                            <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                            Pending:
-                          </span>
-                          <span className="font-extrabold text-amber-700">
-                            Due ₹{bal.balanceAmount.toLocaleString('en-IN')}
-                          </span>
-                        </div>
-                      );
-                    } else {
-                      return (
-                        <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center justify-between text-xs font-semibold animate-in fade-in">
-                          <span className="flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            Settled:
-                          </span>
-                          <span className="font-extrabold text-emerald-700">
-                            ₹{bal.totalCost.toLocaleString('en-IN')}
-                          </span>
-                        </div>
-                      );
-                    }
-                  })()}
-                </div>
 
                 {/* 5. AGENT ASSIGNMENT & NOTES */}
                 <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2.5">

@@ -9,6 +9,7 @@ import { Modal } from '@/components/ui/modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { AgentDetailModal } from '@/components/shared/agent-detail-modal';
 import { User, UserRole, UserStatus } from '@/lib/types';
+import { validateMobile, validateEmail, validateName, onlyDigits } from '@/lib/validation';
 import {
   ShieldCheck,
   UserPlus,
@@ -38,6 +39,7 @@ export default function AgentsPage() {
   const [newAgentPassword, setNewAgentPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [newAgentRole, setNewAgentRole] = useState<UserRole>('AGENT');
+  const [addAgentError, setAddAgentError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   // View agent detail modal state
@@ -51,6 +53,7 @@ export default function AgentsPage() {
   const [editMobile, setEditMobile] = useState('');
   const [editRole, setEditRole] = useState<UserRole>('AGENT');
   const [editStatus, setEditStatus] = useState<UserStatus>('ACTIVE');
+  const [editAgentError, setEditAgentError] = useState('');
 
   // Delete agent state
   const [agentToDelete, setAgentToDelete] = useState<User | null>(null);
@@ -317,21 +320,38 @@ export default function AgentsPage() {
         <form
           onSubmit={async (e) => {
             e.preventDefault();
-            if (!newAgentName.trim() || !newAgentEmail.trim() || !newAgentMobile.trim() || !newAgentPassword.trim()) {
-              alert('Please complete all required fields including login password.');
+            setAddAgentError('');
+
+            const nameCheck = validateName(newAgentName, 'Staff Full Name');
+            if (!nameCheck.isValid) {
+              setAddAgentError(nameCheck.error || 'Please enter a valid full name.');
               return;
             }
-            if (newAgentPassword.trim().length < 6) {
-              alert('Login password must be at least 6 characters long.');
+
+            const emailCheck = validateEmail(newAgentEmail, true);
+            if (!emailCheck.isValid) {
+              setAddAgentError(emailCheck.error || 'Please enter a valid office email address.');
               return;
             }
+
+            const mobileCheck = validateMobile(newAgentMobile, 'Contact Mobile', true);
+            if (!mobileCheck.isValid) {
+              setAddAgentError(mobileCheck.error || 'Contact mobile must be a valid 10-digit number.');
+              return;
+            }
+
+            if (!newAgentPassword.trim() || newAgentPassword.trim().length < 6) {
+              setAddAgentError('Login password must be at least 6 characters long.');
+              return;
+            }
+
             setIsSaving(true);
             try {
               await addAgent(
                 {
                   name: newAgentName.trim(),
-                  email: newAgentEmail.trim(),
-                  mobile: newAgentMobile.trim(),
+                  email: newAgentEmail.trim().toLowerCase(),
+                  mobile: mobileCheck.cleaned,
                   role: newAgentRole,
                   status: 'ACTIVE',
                 },
@@ -341,32 +361,46 @@ export default function AgentsPage() {
               setNewAgentEmail('');
               setNewAgentMobile('');
               setNewAgentPassword('');
+              setAddAgentError('');
               setIsAddUserModalOpen(false);
-              alert('Staff account successfully created! They can now log in using their email and password.');
             } catch (err: any) {
-              alert(err?.message || 'Failed to create staff account. Please try again.');
+              setAddAgentError(err?.message || 'Failed to create staff account. Please try again.');
             } finally {
               setIsSaving(false);
             }
           }}
           className="space-y-4"
         >
+          {addAgentError && (
+            <div className="p-3 text-xs bg-rose-50 text-rose-700 rounded-xl border border-rose-200">
+              {addAgentError}
+            </div>
+          )}
           <Input
             label="Staff Full Name"
             required
             value={newAgentName}
-            onChange={(e) => setNewAgentName(e.target.value)}
+            onChange={(e) => {
+              setNewAgentName(e.target.value);
+              if (addAgentError) setAddAgentError('');
+            }}
             placeholder="e.g. Anand Menon"
           />
 
-          <Input
-            label="Office Email Address (Username)"
-            type="email"
-            required
-            value={newAgentEmail}
-            onChange={(e) => setNewAgentEmail(e.target.value)}
-            placeholder="e.g. anand@apexmotors.com"
-          />
+          <div>
+            <Input
+              label="Office Email Address (Username)"
+              type="email"
+              required
+              value={newAgentEmail}
+              onChange={(e) => {
+                setNewAgentEmail(e.target.value);
+                if (addAgentError) setAddAgentError('');
+              }}
+              placeholder="e.g. anand@apexmotors.com"
+            />
+            <span className="text-[10px] text-slate-400 mt-0.5 block">Must be a valid email format</span>
+          </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -396,13 +430,21 @@ export default function AgentsPage() {
             </p>
           </div>
 
-          <Input
-            label="Contact Mobile"
-            required
-            value={newAgentMobile}
-            onChange={(e) => setNewAgentMobile(e.target.value)}
-            placeholder="e.g. +91 98470 55667"
-          />
+          <div>
+            <Input
+              label="Contact Mobile"
+              required
+              type="tel"
+              value={newAgentMobile}
+              onChange={(e) => {
+                setNewAgentMobile(onlyDigits(e.target.value, 10));
+                if (addAgentError) setAddAgentError('');
+              }}
+              placeholder="10-digit mobile (e.g. 9847055667)"
+              className="font-mono"
+            />
+            <span className="text-[10px] text-slate-400 mt-0.5 block">10 digits, numbers only</span>
+          </div>
 
           <Select
             label="Role & Access Scope"
@@ -429,7 +471,10 @@ export default function AgentsPage() {
       {editingAgent && (
         <Modal
           isOpen={Boolean(editingAgent)}
-          onClose={() => setEditingAgent(null)}
+          onClose={() => {
+            setEditingAgent(null);
+            setEditAgentError('');
+          }}
           title="Edit Staff Member"
           description={`Update profile and permissions for ${editingAgent.name}.`}
           maxWidth="md"
@@ -438,43 +483,90 @@ export default function AgentsPage() {
             onSubmit={async (e) => {
               e.preventDefault();
               if (!editingAgent) return;
+              setEditAgentError('');
+
+              const nameVal = validateName(editName, 'Staff full name');
+              if (!nameVal.isValid) {
+                setEditAgentError(nameVal.error || 'Please enter a valid staff name.');
+                return;
+              }
+
+              const emailVal = validateEmail(editEmail, true);
+              if (!emailVal.isValid) {
+                setEditAgentError(emailVal.error || 'Please enter a valid email format.');
+                return;
+              }
+
+              const mobileVal = validateMobile(editMobile, 'Contact mobile', true);
+              if (!mobileVal.isValid) {
+                setEditAgentError(mobileVal.error || 'Please enter a valid 10-digit mobile number.');
+                return;
+              }
+
               setIsSaving(true);
               try {
                 await updateAgent(editingAgent.id, {
                   name: editName.trim(),
-                  email: editEmail.trim(),
-                  mobile: editMobile.trim(),
+                  email: editEmail.trim().toLowerCase(),
+                  mobile: mobileVal.cleaned,
                   role: editRole,
                   status: editStatus,
                 });
                 setEditingAgent(null);
+                setEditAgentError('');
+              } catch (err: any) {
+                setEditAgentError(err?.message || 'Failed to update staff member.');
               } finally {
                 setIsSaving(false);
               }
             }}
             className="space-y-4"
           >
+            {editAgentError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold flex items-center gap-2 animate-in fade-in">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0" />
+                {editAgentError}
+              </div>
+            )}
+
             <Input
               label="Staff Full Name"
               required
               value={editName}
-              onChange={(e) => setEditName(e.target.value)}
+              onChange={(e) => {
+                setEditName(e.target.value);
+                if (editAgentError) setEditAgentError('');
+              }}
             />
 
-            <Input
-              label="Office Email Address"
-              type="email"
-              required
-              value={editEmail}
-              onChange={(e) => setEditEmail(e.target.value)}
-            />
+            <div>
+              <Input
+                label="Office Email Address"
+                type="email"
+                required
+                value={editEmail}
+                onChange={(e) => {
+                  setEditEmail(e.target.value);
+                  if (editAgentError) setEditAgentError('');
+                }}
+              />
+              <span className="text-[10px] text-slate-400 mt-0.5 block">Must be a valid email format (e.g. name@domain.com)</span>
+            </div>
 
-            <Input
-              label="Contact Mobile"
-              required
-              value={editMobile}
-              onChange={(e) => setEditMobile(e.target.value)}
-            />
+            <div>
+              <Input
+                label="Contact Mobile"
+                required
+                type="tel"
+                value={editMobile}
+                onChange={(e) => {
+                  setEditMobile(onlyDigits(e.target.value, 10));
+                  if (editAgentError) setEditAgentError('');
+                }}
+                className="font-mono"
+              />
+              <span className="text-[10px] text-slate-400 mt-0.5 block">10 digits, numbers only (e.g. 9847055667)</span>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <Select
@@ -499,7 +591,10 @@ export default function AgentsPage() {
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-              <Button type="button" variant="secondary" onClick={() => setEditingAgent(null)}>
+              <Button type="button" variant="secondary" onClick={() => {
+                setEditingAgent(null);
+                setEditAgentError('');
+              }}>
                 Cancel
               </Button>
               <Button type="submit" variant="primary" isLoading={isSaving}>

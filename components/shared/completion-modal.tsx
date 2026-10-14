@@ -1,14 +1,25 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useApp } from '@/lib/store/app-context';
-import { VehicleDocument } from '@/lib/types';
-import { CheckCircle2, FileText, ArrowRight, Wallet, AlertCircle } from 'lucide-react';
+import { DocumentType, VehicleDocument } from '@/lib/types';
+import {
+  CheckCircle2,
+  FileText,
+  ArrowRight,
+  UploadCloud,
+  X,
+  Calendar,
+  Sparkles,
+  ShieldCheck,
+  RotateCw,
+  FileCheck2,
+  Clock,
+  Layers,
+} from 'lucide-react';
 import { calculateNextDueDate, getDocumentTypeName } from '@/lib/renewals/engine';
-import { calculatePaymentBalance } from '@/lib/utils';
 
 interface CompletionModalProps {
   isOpen: boolean;
@@ -16,6 +27,53 @@ interface CompletionModalProps {
   document: VehicleDocument;
   linkedTaskId?: string;
   registrationNumber: string;
+}
+
+// Helpers for document category badges & presets
+function getDocTheme(docType: DocumentType) {
+  switch (docType) {
+    case 'PUC':
+      return {
+        badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        ring: 'ring-emerald-500/20',
+        accent: 'text-emerald-600',
+        defaultQuick: 6,
+        quickUnit: 'MONTHS' as const,
+      };
+    case 'INSURANCE':
+      return {
+        badge: 'bg-purple-50 text-purple-700 border-purple-200',
+        ring: 'ring-purple-500/20',
+        accent: 'text-purple-600',
+        defaultQuick: 1,
+        quickUnit: 'YEARS' as const,
+      };
+    case 'FITNESS':
+      return {
+        badge: 'bg-amber-50 text-amber-700 border-amber-200',
+        ring: 'ring-amber-500/20',
+        accent: 'text-amber-600',
+        defaultQuick: 1,
+        quickUnit: 'YEARS' as const,
+      };
+    case 'ROAD_TAX':
+    case 'GREEN_TAX':
+      return {
+        badge: 'bg-blue-50 text-blue-700 border-blue-200',
+        ring: 'ring-blue-500/20',
+        accent: 'text-blue-600',
+        defaultQuick: 1,
+        quickUnit: 'YEARS' as const,
+      };
+    default:
+      return {
+        badge: 'bg-slate-50 text-slate-700 border-slate-200',
+        ring: 'ring-slate-500/20',
+        accent: 'text-slate-600',
+        defaultQuick: 1,
+        quickUnit: 'YEARS' as const,
+      };
+  }
 }
 
 export function CompletionModal({
@@ -26,244 +84,369 @@ export function CompletionModal({
   registrationNumber,
 }: CompletionModalProps) {
   const { completeRenewalCycle } = useApp();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [newDocumentNumber, setNewDocumentNumber] = useState(doc.documentNumber || '');
-  const [newIssueDate, setNewIssueDate] = useState(new Date().toISOString().split('T')[0]);
   const [newExpiryDate, setNewExpiryDate] = useState('');
-  
-  // Financial tracking (Total Cost vs Received)
-  const [totalCost, setTotalCost] = useState<string>(doc.amount ? String(doc.amount) : '');
-  const [amountReceived, setAmountReceived] = useState<string>('');
-
-  const [notes, setNotes] = useState('');
+  const [selectedQuickPreset, setSelectedQuickPreset] = useState<string | null>(null);
   const [fileName, setFileName] = useState('');
+  const [fileUrl, setFileUrl] = useState('');
+  const [fileSize, setFileSize] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [completionError, setCompletionError] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
 
-  // Quick preset helper
-  const handleQuickValidity = (years: number) => {
-    const computed = calculateNextDueDate(newIssueDate, years, 'YEARS');
+  const theme = getDocTheme(doc.documentType);
+  const baseDate = doc.expiryDate || new Date().toISOString().split('T')[0];
+
+  const handleQuickValidity = (years: number, label: string) => {
+    const computed = calculateNextDueDate(baseDate, years, 'YEARS');
     setNewExpiryDate(computed);
+    setSelectedQuickPreset(label);
+    if (completionError) setCompletionError('');
   };
 
-  const handleQuickMonths = (months: number) => {
-    const computed = calculateNextDueDate(newIssueDate, months, 'MONTHS');
+  const handleQuickMonths = (months: number, label: string) => {
+    const computed = calculateNextDueDate(baseDate, months, 'MONTHS');
     setNewExpiryDate(computed);
+    setSelectedQuickPreset(label);
+    if (completionError) setCompletionError('');
   };
 
-  // Compute live financial settlement
-  const balanceSummary = calculatePaymentBalance(
-    totalCost ? Number(totalCost) : 0,
-    amountReceived ? Number(amountReceived) : 0
-  );
+  const handleProcessFile = (file: File) => {
+    setFileName(file.name);
+    const sizeKb = Math.round(file.size / 1024);
+    setFileSize(sizeKb > 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${sizeKb} KB`);
 
-  const handleSubmit = (e: React.FormEvent) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setFileUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleProcessFile(e.target.files[0]);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleProcessFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setFileName('');
+    setFileUrl('');
+    setFileSize('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCompletionError('');
+
     if (!newExpiryDate) {
-      alert('Please enter or select the new expiry/due date for the next cycle.');
+      setCompletionError('Please select or specify the new validity expiry date.');
       return;
     }
 
     setIsSubmitting(true);
-    completeRenewalCycle(
-      doc.id,
-      {
-        newDocumentNumber: newDocumentNumber || undefined,
-        newIssueDate,
-        newExpiryDate,
-        newAmount: totalCost ? Number(totalCost) : undefined,
-        amountReceived: amountReceived ? Number(amountReceived) : undefined,
-        balanceAmount: balanceSummary.balanceAmount,
-        paymentStatus: balanceSummary.paymentStatus,
-        notes: notes || undefined,
-        fileName: fileName || undefined,
-        fileUrl: fileName ? `/uploads/${fileName}` : undefined,
-      },
-      linkedTaskId
-    );
-
-    setIsSubmitting(false);
-    onClose();
+    try {
+      await completeRenewalCycle(
+        doc.id,
+        {
+          newExpiryDate,
+          newIssueDate: new Date().toISOString().split('T')[0],
+          fileName: fileName || undefined,
+          fileUrl: fileUrl || undefined,
+        },
+        linkedTaskId
+      );
+      onClose();
+    } catch (err: any) {
+      setCompletionError(err?.message || 'Failed to complete renewal.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Complete Renewal & Next Cycle Setup"
-      description={`Record completed renewal for ${registrationNumber}, collect fees, and prompt next valid expiry date.`}
+      title=""
       maxWidth="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Current status banner */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between text-xs">
-          <div>
-            <span className="font-semibold text-slate-800">
-              {getDocumentTypeName(doc.documentType)}:
-            </span>{' '}
-            <span className="text-slate-600">Previous Expiry: {doc.expiryDate || 'N/A'}</span>
+      <form onSubmit={handleSubmit} className="space-y-3.5">
+        {/* Modern Header */}
+        <div className="flex items-start gap-3.5 pb-3.5 border-b border-slate-100">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+            <CheckCircle2 className="w-5 h-5" />
           </div>
-          <div className="flex items-center gap-1.5 text-blue-700 font-semibold bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200">
-            <ArrowRight className="w-3.5 h-3.5" />
-            Archive to History &amp; Start Next Cycle
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                {registrationNumber}
+              </span>
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${theme.badge}`}>
+                {getDocumentTypeName(doc.documentType)}
+              </span>
+            </div>
+            <h2 className="text-base font-bold text-slate-900 leading-tight">
+              Complete Renewal Cycle
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Record new validity milestone and archive current certificate.
+            </p>
           </div>
         </div>
 
-        {/* Inputs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-          <Input
-            label="New Document / Policy Number"
-            value={newDocumentNumber}
-            onChange={(e) => setNewDocumentNumber(e.target.value)}
-            placeholder="e.g. POL-2026-9901 or PUC-778"
-          />
+        {/* Error Alert */}
+        {completionError && (
+          <div className="p-3 bg-rose-50 border border-rose-200/90 rounded-xl text-xs text-rose-700 font-semibold flex items-center gap-2 animate-in fade-in">
+            <span className="w-2 h-2 rounded-full bg-rose-600 shrink-0 animate-ping" />
+            <span>{completionError}</span>
+          </div>
+        )}
 
-          <Input
-            label="Issue / Payment Date"
-            type="date"
-            required
-            value={newIssueDate}
-            onChange={(e) => setNewIssueDate(e.target.value)}
-          />
+        {/* Sleek Cycle Timeline Flow */}
+        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/70 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-white text-slate-500 flex items-center justify-center border border-slate-200 shrink-0">
+              <Clock className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Previous Expiry</div>
+              <div className="font-mono font-bold text-slate-700 text-xs">{doc.expiryDate || 'N/A'}</div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 px-3 text-slate-300">
+            <div className="w-6 h-0.5 bg-slate-200" />
+            <ArrowRight className="w-4 h-4 text-blue-500" />
+            <div className="w-6 h-0.5 bg-slate-200" />
+          </div>
+
+          <div className="flex items-center gap-2 text-right">
+            <div>
+              <div className="text-[10px] uppercase font-bold text-blue-600 tracking-wider">New Expiry</div>
+              <div className="font-mono font-bold text-blue-700 text-xs">
+                {newExpiryDate ? (
+                  <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                    {newExpiryDate}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 italic font-normal">Select below</span>
+                )}
+              </div>
+            </div>
+            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200 shrink-0">
+              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+            </div>
+          </div>
         </div>
 
-        {/* Valid Until When? (Next Expiry Date) */}
-        <div className="p-3.5 rounded-xl bg-purple-50/60 border border-purple-200/80 space-y-2">
-          <Input
-            label="Valid Until When? (Next Expiry Date)"
+        {/* Expiry Date & Quick Intervals */}
+        <div className="space-y-2">
+          <label className="block text-xs font-bold text-slate-800 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-blue-600" />
+              New Validity Expiry Date <span className="text-rose-500">*</span>
+            </span>
+            <span className="text-[11px] font-normal text-slate-400">DD / MM / YYYY</span>
+          </label>
+
+          <input
             type="date"
             required
             value={newExpiryDate}
-            onChange={(e) => setNewExpiryDate(e.target.value)}
-            className="font-bold text-slate-900"
+            onChange={(e) => {
+              setNewExpiryDate(e.target.value);
+              setSelectedQuickPreset(null);
+              if (completionError) setCompletionError('');
+            }}
+            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-900 font-mono font-bold text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/30 focus:border-blue-600 transition-all cursor-pointer shadow-2xs"
           />
 
-          {/* Quick validity buttons */}
-          <div className="flex gap-2 pt-1 flex-wrap items-center">
-            <span className="text-[11px] font-bold text-purple-900">Quick Set:</span>
-            <button
-              type="button"
-              onClick={() => handleQuickMonths(6)}
-              className="text-xs bg-white hover:bg-purple-100 text-purple-700 border border-purple-200 font-semibold px-2.5 py-1 rounded-lg cursor-pointer transition-colors"
-            >
-              +6 Months (PUC)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickValidity(1)}
-              className="text-xs bg-white hover:bg-purple-100 text-purple-700 border border-purple-200 font-semibold px-2.5 py-1 rounded-lg cursor-pointer transition-colors"
-            >
-              +1 Year (Insurance / Fitness)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickValidity(2)}
-              className="text-xs bg-white hover:bg-purple-100 text-purple-700 border border-purple-200 font-semibold px-2.5 py-1 rounded-lg cursor-pointer transition-colors"
-            >
-              +2 Years
-            </button>
+          {/* Quick Preset Segmented Pills */}
+          <div className="pt-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 flex items-center gap-1">
+                <RotateCw className="w-2.5 h-2.5" /> Presets:
+              </span>
+
+              {doc.documentType === 'PUC' && (
+                <button
+                  type="button"
+                  onClick={() => handleQuickMonths(6, '+6 Months (PUC)')}
+                  className={`text-xs px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                    selectedQuickPreset === '+6 Months (PUC)'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                  }`}
+                >
+                  +6 Mo (PUC)
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => handleQuickValidity(1, '+1 Year')}
+                className={`text-xs px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                  selectedQuickPreset === '+1 Year'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                }`}
+              >
+                +1 Year
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickValidity(2, '+2 Years')}
+                className={`text-xs px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                  selectedQuickPreset === '+2 Years'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                }`}
+              >
+                +2 Years
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickValidity(3, '+3 Years')}
+                className={`text-xs px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                  selectedQuickPreset === '+3 Years'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                }`}
+              >
+                +3 Years
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickValidity(5, '+5 Years')}
+                className={`text-xs px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                  selectedQuickPreset === '+5 Years'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                }`}
+              >
+                +5 Years
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Financial Settlement & Billing Section */}
-        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-            <Wallet className="w-4 h-4 text-emerald-600" />
-            <span>Financial Billing &amp; Settlement</span>
-          </div>
+        {/* Compact File Uploader */}
+        <div className="space-y-1.5 pt-1">
+          <label className="block text-xs font-bold text-slate-800 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <FileCheck2 className="w-3.5 h-3.5 text-blue-600" />
+              Attach Digital Copy (Optional)
+            </span>
+            <span className="text-[11px] font-normal text-slate-400">PDF, JPG, PNG (Max 15MB)</span>
+          </label>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              label="Total Service / Policy Fee (₹)"
-              type="number"
-              placeholder="e.g. 5500"
-              value={totalCost}
-              onChange={(e) => setTotalCost(e.target.value)}
-              helperText="Charge for insurance/fitness/puc"
-            />
+          <input
+            ref={fileInputRef}
+            type="file"
+            id="renewalDocUpload"
+            className="hidden"
+            accept=".pdf,.png,.jpg,.jpeg,.webp"
+            onChange={handleFileChange}
+          />
 
-            <Input
-              label="Amount Received from Client (₹)"
-              type="number"
-              placeholder="e.g. 10000 or 2000"
-              value={amountReceived}
-              onChange={(e) => setAmountReceived(e.target.value)}
-              helperText="Cash / UPI received"
-            />
-          </div>
-
-          {/* Live Dynamic Settlement Calculation */}
-          {(totalCost !== '' || amountReceived !== '') && (
-            <div className="pt-1">
-              {balanceSummary.paymentStatus === 'REFUND_DUE' ? (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 text-xs font-semibold">
-                  <Wallet className="w-4 h-4 text-blue-600 shrink-0" />
-                  <div>
-                    <strong>Return to Client: ₹{balanceSummary.balanceAmount.toLocaleString('en-IN')}</strong>
-                    <span className="block text-[11px] text-blue-700">Client overpaid (Fee: ₹{Number(totalCost).toLocaleString('en-IN')} | Paid: ₹{Number(amountReceived).toLocaleString('en-IN')})</span>
+          {fileName ? (
+            <div className="p-3 bg-emerald-50/90 border border-emerald-200 rounded-xl flex items-center justify-between text-xs shadow-2xs">
+              <div className="flex items-center gap-2.5 overflow-hidden">
+                <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div className="overflow-hidden">
+                  <div className="font-bold text-slate-900 truncate max-w-[220px] sm:max-w-xs text-xs">
+                    {fileName}
+                  </div>
+                  <div className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    <span>Attached {fileSize && `• ${fileSize}`}</span>
                   </div>
                 </div>
-              ) : balanceSummary.paymentStatus === 'BALANCE_DUE' ? (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <div>
-                    <strong>Due from Client: ₹{balanceSummary.balanceAmount.toLocaleString('en-IN')}</strong>
-                    <span className="block text-[11px] text-amber-700">Pending balance to collect (Fee: ₹{Number(totalCost).toLocaleString('en-IN')} | Paid: ₹{Number(amountReceived).toLocaleString('en-IN')})</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Payment Fully Settled (₹{Number(totalCost).toLocaleString('en-IN')})</span>
-                </div>
-              )}
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <label
+                  htmlFor="renewalDocUpload"
+                  className="px-2 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors"
+                >
+                  Change
+                </label>
+                <button
+                  type="button"
+                  onClick={handleRemoveFile}
+                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                  title="Remove file"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
+          ) : (
+            <label
+              htmlFor="renewalDocUpload"
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+              className={`border border-dashed rounded-xl py-3 px-4 text-center transition-all cursor-pointer flex items-center justify-center gap-2.5 group ${
+                isDragging
+                  ? 'border-blue-500 bg-blue-50/70 ring-2 ring-blue-500/20'
+                  : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50/30 bg-slate-50/50'
+              }`}
+            >
+              <div className="w-7 h-7 rounded-full bg-blue-50 group-hover:bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 transition-colors">
+                <UploadCloud className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <span className="text-xs font-semibold text-slate-700 group-hover:text-blue-600 transition-colors">
+                  Upload renewed certificate scan
+                </span>
+                <span className="text-[10px] text-slate-400 block">
+                  Click to browse or drag &amp; drop file here
+                </span>
+              </div>
+            </label>
           )}
         </div>
 
-        {/* Upload attachment */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">
-            Attach Renewed Policy / Certificate Document (Optional)
-          </label>
-          <div className="border border-dashed border-slate-300 rounded-lg p-2.5 text-center hover:bg-slate-50 transition-colors">
-            <input
-              type="file"
-              id="renewalDocFile"
-              className="hidden"
-              accept=".pdf,.png,.jpg,.jpeg"
-              onChange={(e) => {
-                if (e.target.files && e.target.files[0]) {
-                  setFileName(e.target.files[0].name);
-                }
-              }}
-            />
-            <label
-              htmlFor="renewalDocFile"
-              className="cursor-pointer text-xs flex items-center justify-center text-slate-600 gap-1.5"
-            >
-              <FileText className="w-4 h-4 text-blue-600" />
-              <span className="font-semibold text-blue-600">
-                {fileName ? fileName : 'Upload PDF / JPG policy copy'}
-              </span>
-            </label>
-          </div>
-        </div>
-
-        {/* Notes */}
-        <Input
-          label="Notes / Remarks"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="e.g. 50% NCB applied, certificate handed over to driver"
-        />
-
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
+        {/* Modal Actions */}
+        <div className="flex items-center justify-end gap-2.5 pt-3.5 border-t border-slate-100">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="rounded-xl px-4 text-xs font-semibold cursor-pointer"
+          >
             Cancel
           </Button>
-          <Button type="submit" variant="primary" isLoading={isSubmitting} className="gap-1.5 font-bold">
+          <Button
+            type="submit"
+            variant="primary"
+            isLoading={isSubmitting}
+            className="rounded-xl px-5 text-xs font-bold gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm cursor-pointer"
+          >
             <CheckCircle2 className="w-4 h-4" />
-            Confirm Renewal &amp; Update System
+            <span>Confirm &amp; Roll Over</span>
           </Button>
         </div>
       </form>

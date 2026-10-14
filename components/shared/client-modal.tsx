@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { useApp } from '@/lib/store/app-context';
 import { Client } from '@/lib/types';
+import { validateMobile, validateEmail, cleanMobileNumber, onlyDigits } from '@/lib/validation';
 
 interface ClientModalProps {
   isOpen: boolean;
@@ -23,10 +24,12 @@ export function ClientModal({ isOpen, onClose, initialClient }: ClientModalProps
   const [address, setAddress] = useState('');
   const [assignedAgentId, setAssignedAgentId] = useState('');
   const [notes, setNotes] = useState('');
+  const [formError, setFormError] = useState('');
 
   const activeAgents = users.filter((u) => u.status === 'ACTIVE');
 
   useEffect(() => {
+    setFormError('');
     if (initialClient) {
       setName(initialClient.name);
       setMobile(initialClient.mobile);
@@ -52,18 +55,56 @@ export function ClientModal({ isOpen, onClose, initialClient }: ClientModalProps
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
 
-    if (!name.trim() || !mobile.trim() || !address.trim() || !assignedAgentId) {
-      alert('Please fill in all required fields.');
+    // 1. Name validation
+    if (!name.trim() || name.trim().length < 2) {
+      setFormError('Please enter a valid Client / Company name (at least 2 characters).');
+      return;
+    }
+
+    // 2. Primary Mobile validation (Must be numbers only, 10 digits)
+    const mobileCheck = validateMobile(mobile, 'Primary Mobile Number', true);
+    if (!mobileCheck.isValid) {
+      setFormError(mobileCheck.error || 'Invalid primary mobile number.');
+      return;
+    }
+
+    // 3. Alternate Mobile validation (if entered, must be 10 digits numbers only)
+    if (alternateMobile.trim()) {
+      const altCheck = validateMobile(alternateMobile, 'Alternate Mobile', false);
+      if (!altCheck.isValid) {
+        setFormError(altCheck.error || 'Invalid alternate mobile number.');
+        return;
+      }
+    }
+
+    // 4. Email validation (if entered, must match email format)
+    if (email.trim()) {
+      const emailCheck = validateEmail(email, false);
+      if (!emailCheck.isValid) {
+        setFormError(emailCheck.error || 'Invalid email format.');
+        return;
+      }
+    }
+
+    // 5. Address validation
+    if (!address.trim()) {
+      setFormError('Office / Residential address is required.');
+      return;
+    }
+
+    if (!assignedAgentId) {
+      setFormError('Please assign a staff agent to this client.');
       return;
     }
 
     if (initialClient) {
       updateClient(initialClient.id, {
         name: name.trim(),
-        mobile: mobile.trim(),
-        alternateMobile: alternateMobile.trim() || undefined,
-        email: email.trim() || undefined,
+        mobile: mobileCheck.cleaned,
+        alternateMobile: alternateMobile.trim() ? cleanMobileNumber(alternateMobile) : undefined,
+        email: email.trim().toLowerCase() || undefined,
         address: address.trim(),
         assignedAgentId,
         notes: notes.trim() || undefined,
@@ -71,9 +112,9 @@ export function ClientModal({ isOpen, onClose, initialClient }: ClientModalProps
     } else {
       addClient({
         name: name.trim(),
-        mobile: mobile.trim(),
-        alternateMobile: alternateMobile.trim() || undefined,
-        email: email.trim() || undefined,
+        mobile: mobileCheck.cleaned,
+        alternateMobile: alternateMobile.trim() ? cleanMobileNumber(alternateMobile) : undefined,
+        email: email.trim().toLowerCase() || undefined,
         address: address.trim(),
         assignedAgentId,
         status: 'ACTIVE',
@@ -93,39 +134,71 @@ export function ClientModal({ isOpen, onClose, initialClient }: ClientModalProps
       maxWidth="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        {formError && (
+          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700 flex items-center gap-2">
+            <span>⚠️</span>
+            <span>{formError}</span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="Full Name / Company Name"
             required
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (formError) setFormError('');
+            }}
             placeholder="e.g. Mohammed Ali"
           />
 
-          <Input
-            label="Primary Mobile Number"
-            required
-            value={mobile}
-            onChange={(e) => setMobile(e.target.value)}
-            placeholder="e.g. +91 98471 23456"
-          />
+          <div>
+            <Input
+              label="Primary Mobile Number"
+              required
+              type="tel"
+              value={mobile}
+              onChange={(e) => {
+                setMobile(onlyDigits(e.target.value, 10));
+                if (formError) setFormError('');
+              }}
+              placeholder="10-digit mobile (e.g. 9847123456)"
+              className="font-mono"
+            />
+            <span className="text-[10px] text-slate-400 mt-0.5 block">10 digits, numbers only</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input
-            label="Alternate Mobile (Optional)"
-            value={alternateMobile}
-            onChange={(e) => setAlternateMobile(e.target.value)}
-            placeholder="e.g. +91 98471 99999"
-          />
+          <div>
+            <Input
+              label="Alternate Mobile (Optional)"
+              type="tel"
+              value={alternateMobile}
+              onChange={(e) => {
+                setAlternateMobile(onlyDigits(e.target.value, 10));
+                if (formError) setFormError('');
+              }}
+              placeholder="10-digit mobile"
+              className="font-mono"
+            />
+            <span className="text-[10px] text-slate-400 mt-0.5 block">Numbers only</span>
+          </div>
 
-          <Input
-            label="Email Address (Optional)"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="e.g. client@example.com"
-          />
+          <div>
+            <Input
+              label="Email Address (Optional)"
+              type="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (formError) setFormError('');
+              }}
+              placeholder="client@example.com"
+            />
+            <span className="text-[10px] text-slate-400 mt-0.5 block">Must be valid email format</span>
+          </div>
         </div>
 
         <div>

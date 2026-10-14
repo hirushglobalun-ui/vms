@@ -63,9 +63,9 @@ export function TaskStatusBadge({ status }: { status: TaskStatus }) {
       );
     case 'PROCESSING':
       return (
-        <Badge variant="default" className="gap-1 bg-purple-50 text-purple-700 border-purple-200">
+        <Badge variant="default" className="gap-1 bg-blue-50 text-blue-700 border-blue-200">
           <Hourglass className="w-3 h-3" />
-          PROCESSING
+          IN PROGRESS
         </Badge>
       );
     case 'COMPLETED':
