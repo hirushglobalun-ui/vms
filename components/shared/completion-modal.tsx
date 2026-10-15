@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/lib/store/app-context';
@@ -18,8 +18,12 @@ import {
   FileCheck2,
   Clock,
   Layers,
+  Receipt,
+  IndianRupee,
+  AlertCircle,
 } from 'lucide-react';
 import { calculateNextDueDate, getDocumentTypeName } from '@/lib/renewals/engine';
+import { calculatePaymentBalance } from '@/lib/utils';
 
 interface CompletionModalProps {
   isOpen: boolean;
@@ -83,11 +87,20 @@ export function CompletionModal({
   linkedTaskId,
   registrationNumber,
 }: CompletionModalProps) {
-  const { completeRenewalCycle } = useApp();
+  const { completeRenewalCycle, vehicles, tasks } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const linkedTask = linkedTaskId ? tasks.find((t) => t.id === linkedTaskId) : undefined;
+  const linkedVehicle = doc.vehicleId ? vehicles.find((v) => v.id === doc.vehicleId) : undefined;
 
   const [newExpiryDate, setNewExpiryDate] = useState('');
   const [selectedQuickPreset, setSelectedQuickPreset] = useState<string | null>(null);
+
+  // Financial & Billing Tracking
+  const [finalAmount, setFinalAmount] = useState<string>('');
+  const [amountReceived, setAmountReceived] = useState<string>('');
+  const [markSettledNow, setMarkSettledNow] = useState<boolean>(false);
+
   const [fileName, setFileName] = useState('');
   const [fileUrl, setFileUrl] = useState('');
   const [fileSize, setFileSize] = useState('');
@@ -97,6 +110,17 @@ export function CompletionModal({
 
   const theme = getDocTheme(doc.documentType);
   const baseDate = doc.expiryDate || new Date().toISOString().split('T')[0];
+
+  useEffect(() => {
+    if (isOpen) {
+      const adv = linkedTask?.amountReceived ?? doc.amountReceived ?? linkedVehicle?.amountReceived;
+      const cost = doc.amount ?? linkedTask?.estimatedCost ?? linkedVehicle?.totalCost;
+      setFinalAmount(cost !== undefined && cost !== null ? String(cost) : '');
+      setAmountReceived(adv !== undefined && adv !== null ? String(adv) : '');
+      setMarkSettledNow(false);
+      setCompletionError('');
+    }
+  }, [isOpen, doc.id, linkedTaskId, linkedTask, linkedVehicle, doc.amountReceived, doc.amount]);
 
   const handleQuickValidity = (years: number, label: string) => {
     const computed = calculateNextDueDate(baseDate, years, 'YEARS');
@@ -149,6 +173,14 @@ export function CompletionModal({
     }
   };
 
+  const parsedFinal = finalAmount.trim() ? Number(finalAmount) : 0;
+  const parsedReceived = markSettledNow
+    ? parsedFinal
+    : (amountReceived.trim() ? Number(amountReceived) : 0);
+  const billingSummary = (finalAmount.trim() || amountReceived.trim())
+    ? calculatePaymentBalance(parsedFinal, parsedReceived)
+    : null;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCompletionError('');
@@ -165,6 +197,10 @@ export function CompletionModal({
         {
           newExpiryDate,
           newIssueDate: new Date().toISOString().split('T')[0],
+          newAmount: finalAmount.trim() ? parsedFinal : undefined,
+          amountReceived: (amountReceived.trim() || markSettledNow) ? parsedReceived : undefined,
+          balanceAmount: billingSummary ? billingSummary.balanceAmount : undefined,
+          paymentStatus: billingSummary ? billingSummary.paymentStatus : undefined,
           fileName: fileName || undefined,
           fileUrl: fileUrl || undefined,
         },
@@ -346,6 +382,119 @@ export function CompletionModal({
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Final Settlement & Billing Comparison */}
+        <div className="p-3.5 rounded-xl bg-slate-50/90 border border-slate-200/90 space-y-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-slate-900 flex items-center gap-1.5">
+              <Receipt className="w-3.5 h-3.5 text-blue-600" />
+              Settlement &amp; Billing (തുക താരതമ്യം ചെയ്യൽ)
+            </span>
+            <span className="text-[11px] text-slate-500 font-medium">Final Cost vs Advance</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                Final Total Amount (₹) <span className="text-slate-400 font-normal">(യഥാർത്ഥ തുക)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-slate-400 text-xs font-semibold">₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 1500"
+                  value={finalAmount}
+                  onChange={(e) => setFinalAmount(e.target.value)}
+                  className="w-full pl-7 pr-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 font-mono font-bold bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/30 focus:border-blue-600 shadow-2xs"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                Advance Paid by Client (₹) <span className="text-slate-400 font-normal">(മുൻപ് നൽകിയത്)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-slate-400 text-xs font-semibold">₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 500"
+                  disabled={markSettledNow}
+                  value={markSettledNow ? (finalAmount || '0') : amountReceived}
+                  onChange={(e) => setAmountReceived(e.target.value)}
+                  className="w-full pl-7 pr-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 font-mono font-bold bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/30 focus:border-blue-600 disabled:bg-slate-100 disabled:text-slate-500 shadow-2xs"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Settle Now Toggle Checkbox */}
+          {billingSummary && billingSummary.paymentStatus === 'BALANCE_DUE' && (
+            <label className="flex items-center gap-2 cursor-pointer pt-0.5 select-none text-xs text-slate-700 font-medium">
+              <input
+                type="checkbox"
+                checked={markSettledNow}
+                onChange={(e) => setMarkSettledNow(e.target.checked)}
+                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+              />
+              <span>
+                Mark remaining <strong className="font-mono text-slate-900">₹{billingSummary.balanceAmount.toLocaleString('en-IN')}</strong> as received now (പൂർണ്ണമായി വാങ്ങി സെറ്റിൽഡ് ആക്കുക)
+              </span>
+            </label>
+          )}
+
+          {/* Dynamic Comparison Banner */}
+          {billingSummary && (finalAmount.trim() || amountReceived.trim() || markSettledNow) && (
+            <div
+              className={`p-2.5 rounded-xl border text-xs flex items-center justify-between transition-all shadow-2xs ${
+                markSettledNow || billingSummary.paymentStatus === 'SETTLED'
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                  : billingSummary.paymentStatus === 'REFUND_DUE'
+                  ? 'bg-blue-50 text-blue-900 border-blue-300'
+                  : 'bg-amber-50 text-amber-950 border-amber-300'
+              }`}
+            >
+              <div className="flex items-center gap-2 font-bold">
+                {markSettledNow || billingSummary.paymentStatus === 'SETTLED' ? (
+                  <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  </div>
+                ) : (
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-white ${
+                    billingSummary.paymentStatus === 'REFUND_DUE' ? 'bg-blue-600' : 'bg-amber-600'
+                  }`}>
+                    <AlertCircle className="w-3.5 h-3.5" />
+                  </div>
+                )}
+                <div>
+                  {markSettledNow ? (
+                    <span>
+                      Payment Settled in Full: <strong className="font-mono">₹{parsedFinal.toLocaleString('en-IN')}</strong> (തുക പൂർണ്ണമായി ഒത്തുതീർപ്പായി)
+                    </span>
+                  ) : billingSummary.paymentStatus === 'BALANCE_DUE' ? (
+                    <span>
+                      ⚠️ Balance Due: Collect <strong className="font-mono text-rose-700 text-sm">₹{billingSummary.balanceAmount.toLocaleString('en-IN')}</strong> from client (ബാക്കി തുക വാങ്ങുക)
+                    </span>
+                  ) : billingSummary.paymentStatus === 'REFUND_DUE' ? (
+                    <span>
+                      🔄 Refund Due: Return <strong className="font-mono text-blue-700 text-sm">₹{billingSummary.balanceAmount.toLocaleString('en-IN')}</strong> to client (അധിക തുക തിരിച്ചു നൽകുക)
+                    </span>
+                  ) : (
+                    <span>
+                      ✅ All Settled: <strong className="font-mono">₹{billingSummary.totalCost.toLocaleString('en-IN')}</strong> (ബാക്കി ഒന്നുമില്ല)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider bg-white/70 border border-slate-200/50 shrink-0">
+                {markSettledNow ? 'SETTLED' : billingSummary.paymentStatus.replace('_', ' ')}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Compact File Uploader */}

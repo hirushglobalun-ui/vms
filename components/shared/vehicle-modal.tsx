@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { useApp } from '@/lib/store/app-context';
 import { FuelType, Vehicle, VehicleType } from '@/lib/types';
-import { normalizeRegistrationNumber } from '@/lib/utils';
+import { normalizeRegistrationNumber, calculatePaymentBalance } from '@/lib/utils';
 import { validateMobile, validateEmail, onlyDigits } from '@/lib/validation';
 import {
   performRcOcr,
@@ -27,6 +27,8 @@ import {
   FileCheck,
   Flame,
   UserCheck,
+  Receipt,
+  IndianRupee,
 } from 'lucide-react';
 
 interface VehicleModalProps {
@@ -75,7 +77,9 @@ export function VehicleModal({
   const [pocDesignation, setPocDesignation] = useState('Driver');
   const [hasSeparatePoc, setHasSeparatePoc] = useState(false);
 
-
+  // Financial Tracking & Billing Status
+  const [totalCost, setTotalCost] = useState('');
+  const [amountReceived, setAmountReceived] = useState('');
 
   // Vehicle essentials
   const [registrationNumber, setRegistrationNumber] = useState('');
@@ -152,7 +156,9 @@ export function VehicleModal({
       setPocDesignation(initialVehicle.pocDesignation || 'Driver');
       setHasSeparatePoc(Boolean(initialVehicle.pocName || initialVehicle.pocMobile));
 
-
+      // Financial details
+      setTotalCost(initialVehicle.totalCost !== undefined ? String(initialVehicle.totalCost) : '');
+      setAmountReceived(initialVehicle.amountReceived !== undefined ? String(initialVehicle.amountReceived) : '');
 
       // Load existing active documents
       const activeDocs = documents.filter((d) => d.vehicleId === initialVehicle.id && !d.isHistorical);
@@ -218,6 +224,8 @@ export function VehicleModal({
       setPocMobile('');
       setPocDesignation('Driver');
       setHasSeparatePoc(false);
+      setTotalCost('');
+      setAmountReceived('');
 
       setRegistrationDate('');
       setManufacturingMonthYear('');
@@ -422,6 +430,12 @@ export function VehicleModal({
         }
       }
 
+      const parsedCost = totalCost.trim() ? Number(totalCost) : undefined;
+      const parsedReceived = amountReceived.trim() ? Number(amountReceived) : undefined;
+      const billingSummary = (parsedCost !== undefined || parsedReceived !== undefined)
+        ? calculatePaymentBalance(parsedCost || 0, parsedReceived || 0)
+        : null;
+
       const vehiclePayload = {
         clientId: finalClientId,
         registrationNumber: registrationNumber.toUpperCase().trim(),
@@ -445,6 +459,11 @@ export function VehicleModal({
         pocName: hasSeparatePoc && pocName.trim() ? pocName.trim() : undefined,
         pocMobile: hasSeparatePoc && pocMobile.trim() ? pocMobile.trim() : undefined,
         pocDesignation: hasSeparatePoc && pocName.trim() ? pocDesignation : undefined,
+        // Financial Tracking & Billing Status
+        totalCost: parsedCost,
+        amountReceived: parsedReceived,
+        balanceAmount: billingSummary ? billingSummary.balanceAmount : undefined,
+        paymentStatus: billingSummary ? billingSummary.paymentStatus : undefined,
       };
 
       let vehicleId = initialVehicle?.id;
@@ -535,6 +554,12 @@ export function VehicleModal({
       setIsSubmitting(false);
     }
   };
+
+  const parsedCost = totalCost.trim() ? Number(totalCost) : undefined;
+  const parsedReceived = amountReceived.trim() ? Number(amountReceived) : undefined;
+  const billingSummary = (parsedCost !== undefined || parsedReceived !== undefined)
+    ? calculatePaymentBalance(parsedCost || 0, parsedReceived || 0)
+    : null;
 
   return (
     <Modal
@@ -1122,7 +1147,98 @@ export function VehicleModal({
                   </div>
                 </div>
 
+                {/* 4. BILLING & ADVANCE PAYMENT */}
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50/50 via-white to-indigo-50/30 border border-purple-200/90 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-purple-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center">
+                        <Receipt className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          Billing &amp; Advance Payment (അഡ്വാൻസ് &amp; ഫീസ്)
+                        </h3>
+                        <p className="text-[11px] text-slate-500">
+                          Initial token/advance received &amp; estimated cost
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-semibold text-purple-700 bg-purple-100/60 px-2 py-0.5 rounded-md">
+                      Optional
+                    </span>
+                  </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Estimated Service Fee / Cost (₹)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-slate-400 text-xs font-semibold">₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="e.g. 2500"
+                          value={totalCost}
+                          onChange={(e) => setTotalCost(e.target.value)}
+                          className="w-full pl-7 pr-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 font-mono font-bold bg-white focus:outline-none focus:ring-2 focus:ring-purple-600/30 focus:border-purple-600 shadow-2xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Advance / Token Received (₹)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-slate-400 text-xs font-semibold">₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="e.g. 500"
+                          value={amountReceived}
+                          onChange={(e) => setAmountReceived(e.target.value)}
+                          className="w-full pl-7 pr-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 font-mono font-bold bg-white focus:outline-none focus:ring-2 focus:ring-purple-600/30 focus:border-purple-600 shadow-2xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Payment Status Preview */}
+                  {billingSummary && (parsedCost !== undefined || parsedReceived !== undefined) && (
+                    <div
+                      className={`p-2.5 rounded-xl border text-xs flex items-center justify-between transition-all shadow-2xs ${
+                        billingSummary.paymentStatus === 'SETTLED'
+                          ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                          : billingSummary.paymentStatus === 'REFUND_DUE'
+                          ? 'bg-blue-50 text-blue-900 border-blue-300'
+                          : 'bg-amber-50 text-amber-950 border-amber-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold">
+                        {billingSummary.paymentStatus === 'SETTLED' ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        )}
+                        <span>
+                          {billingSummary.paymentStatus === 'BALANCE_DUE' && (
+                            <>Balance Due from Client: <span className="font-mono font-extrabold">₹{billingSummary.balanceAmount.toLocaleString('en-IN')}</span> </>
+                          )}
+                          {billingSummary.paymentStatus === 'REFUND_DUE' && (
+                            <>Refund / Return to Client: <span className="font-mono font-extrabold">₹{billingSummary.balanceAmount.toLocaleString('en-IN')}</span> </>
+                          )}
+                          {billingSummary.paymentStatus === 'SETTLED' && (
+                            <>Fully Settled: <span className="font-mono font-extrabold">₹{billingSummary.totalCost.toLocaleString('en-IN')}</span></>
+                          )}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider bg-white/70 border border-slate-200/50 shrink-0">
+                        {billingSummary.paymentStatus.replace('_', ' ')}
+                      </span>
+                    </div>
+                  )}
+                </div>
 
                 {/* 5. AGENT ASSIGNMENT & NOTES */}
                 <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2.5">

@@ -174,17 +174,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(INITIAL_ACTIVITY_LOGS);
   const [settings, setSettings] = useState<SystemSettings>(INITIAL_SETTINGS);
 
-  // Persistence for local dev mode
+  // Persistence for local dev mode and Central Server Database
   const saveState = (key: string, data: any) => {
     try {
       localStorage.setItem(`${STORAGE_KEY_PREFIX}${key}`, JSON.stringify(data));
     } catch (e) {
       console.warn('Storage save failed:', e);
     }
+
+    // Persist immediately to central server database file (data/db.json)
+    try {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SET_COLLECTION', entity: key, data }),
+      }).catch((e) => console.warn('Central DB sync warning:', e));
+    } catch {}
   };
 
-  // Always hydrate from local storage on mount so data is never lost across builds or reloads
+  // Hydrate from central server database and local storage so data is NEVER lost across ports or tabs
   useEffect(() => {
+    // 1. Instant local storage hydration (0ms paint)
     try {
       const storedUser = localStorage.getItem(`${STORAGE_KEY_PREFIX}user`);
       const storedClients = localStorage.getItem(`${STORAGE_KEY_PREFIX}clients`);
@@ -198,6 +208,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (storedUser) {
         try { setCurrentUser(JSON.parse(storedUser)); } catch {}
+      } else {
+        // Default to active admin account so records are immediately accessible
+        setCurrentUser(INITIAL_USERS[0]);
       }
       if (storedClients) {
         try {
@@ -246,9 +259,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (e) {
       console.error('LocalStorage hydration error:', e);
-    } finally {
-      setIsLoading(false);
     }
+
+    // 2. Load from Central Server Database (data/db.json) to synchronize across all ports & devices
+    fetch('/api/data')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((serverData) => {
+        if (!serverData) return;
+        if (Array.isArray(serverData.vehicles) && serverData.vehicles.length > 0) {
+          setVehicles(serverData.vehicles);
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}vehicles`, JSON.stringify(serverData.vehicles));
+        }
+        if (Array.isArray(serverData.clients) && serverData.clients.length > 0) {
+          setClients(serverData.clients);
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}clients`, JSON.stringify(serverData.clients));
+        }
+        if (Array.isArray(serverData.documents) && serverData.documents.length > 0) {
+          setDocuments(serverData.documents);
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}documents`, JSON.stringify(serverData.documents));
+        }
+        if (Array.isArray(serverData.tasks) && serverData.tasks.length > 0) {
+          setTasks(serverData.tasks);
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}tasks`, JSON.stringify(serverData.tasks));
+        }
+        if (Array.isArray(serverData.users) && serverData.users.length > 0) {
+          setUsers(serverData.users);
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}users`, JSON.stringify(serverData.users));
+        }
+        if (serverData.settings) {
+          setSettings(serverData.settings);
+        }
+      })
+      .catch((err) => console.warn('Central server DB load warning:', err))
+      .finally(() => {
+        setIsLoading(false);
+      });
 
     // If Firebase is configured, listen for live auth state changes
     if (isFirebaseConfigured) {

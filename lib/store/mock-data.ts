@@ -95,8 +95,114 @@ export const INITIAL_CLIENTS: Client[] = [
   },
 ];
 
-export const INITIAL_VEHICLES: Vehicle[] = [];
-export const INITIAL_DOCUMENTS: VehicleDocument[] = [];
-export const INITIAL_TASKS: Task[] = [];
+export const INITIAL_VEHICLES: Vehicle[] = [
+  {
+    id: 'veh_1',
+    registrationNumber: 'KL-53-W-8978',
+    normalizedRegistrationNumber: 'KL53W8978',
+    make: 'SUZUKI',
+    model: 'AVENIS 125',
+    clientId: 'client_1',
+    assignedAgentId: 'user_admin_1',
+    vehicleType: 'TWO_WHEELER',
+    fuelType: 'PETROL',
+    rto: 'KL-53 Perinthalmanna',
+    status: 'ACTIVE',
+    totalCost: 2200,
+    amountReceived: 1000,
+    balanceAmount: 1200,
+    paymentStatus: 'BALANCE_DUE',
+    createdAt: '2026-01-10T11:00:00.000Z',
+    updatedAt: '2026-01-10T11:00:00.000Z',
+    createdBy: 'user_admin_1',
+  },
+  {
+    id: 'veh_2',
+    registrationNumber: 'KL-10-AZ-1234',
+    normalizedRegistrationNumber: 'KL10AZ1234',
+    make: 'TATA',
+    model: 'NEXON EV',
+    clientId: 'client_3',
+    assignedAgentId: 'user_admin_1',
+    vehicleType: 'PRIVATE_CAR',
+    fuelType: 'ELECTRIC',
+    rto: 'KL-10 Malappuram',
+    status: 'ACTIVE',
+    totalCost: 12500,
+    amountReceived: 12500,
+    balanceAmount: 0,
+    paymentStatus: 'SETTLED',
+    createdAt: '2026-02-01T11:00:00.000Z',
+    updatedAt: '2026-02-01T11:00:00.000Z',
+    createdBy: 'user_admin_1',
+  },
+];
+
+export const INITIAL_DOCUMENTS: VehicleDocument[] = [
+  {
+    id: 'doc_1',
+    vehicleId: 'veh_1',
+    clientId: 'client_1',
+    documentType: 'INSURANCE',
+    documentNumber: 'POL-897812',
+    expiryDate: '2027-04-14',
+    reminderDays: 30,
+    status: 'ACTIVE',
+    isHistorical: false,
+    createdAt: '2026-01-10T12:00:00.000Z',
+    updatedAt: '2026-01-10T12:00:00.000Z',
+    createdBy: 'user_admin_1',
+  },
+  {
+    id: 'doc_2',
+    vehicleId: 'veh_1',
+    clientId: 'client_1',
+    documentType: 'PUC',
+    documentNumber: 'PUC-9901',
+    expiryDate: '2026-10-14',
+    reminderDays: 15,
+    status: 'ACTIVE',
+    isHistorical: false,
+    createdAt: '2026-01-10T12:00:00.000Z',
+    updatedAt: '2026-01-10T12:00:00.000Z',
+    createdBy: 'user_admin_1',
+  },
+  {
+    id: 'doc_3',
+    vehicleId: 'veh_2',
+    clientId: 'client_3',
+    documentType: 'INSURANCE',
+    documentNumber: 'POL-123499',
+    expiryDate: '2026-11-20',
+    reminderDays: 30,
+    status: 'ACTIVE',
+    isHistorical: false,
+    createdAt: '2026-02-01T12:00:00.000Z',
+    updatedAt: '2026-02-01T12:00:00.000Z',
+    createdBy: 'user_admin_1',
+  },
+];
+
+export const INITIAL_TASKS: Task[] = [
+  {
+    id: 'task_1',
+    title: 'PUC Renewal Follow-Up: KL-53-W-8978',
+    clientId: 'client_1',
+    vehicleId: 'veh_1',
+    documentId: 'doc_2',
+    assignedTo: 'user_admin_1',
+    dueDate: '2026-10-14',
+    priority: 'HIGH',
+    status: 'PENDING',
+    estimatedCost: 500,
+    amountReceived: 200,
+    balanceAmount: 300,
+    paymentStatus: 'BALANCE_DUE',
+    createdAt: '2026-01-10T12:00:00.000Z',
+    updatedAt: '2026-01-10T12:00:00.000Z',
+    createdBy: 'user_admin_1',
+  },
+];
+
 export const INITIAL_NOTIFICATIONS: Notification[] = [];
 export const INITIAL_ACTIVITY_LOGS: ActivityLog[] = [];

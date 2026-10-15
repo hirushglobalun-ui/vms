@@ -40,6 +40,8 @@ import {
   Flame,
   RotateCcw,
   Sparkles,
+  Receipt,
+  IndianRupee,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -240,6 +242,27 @@ export default function VehicleDetailPage() {
                   {agent?.name || 'Unassigned'}
                 </span>
               </div>
+
+              {/* Billing & Advance Payment Status */}
+              {(vehicle.totalCost !== undefined || vehicle.amountReceived !== undefined || vehicle.paymentStatus) && (
+                <div className="flex items-center gap-1.5">
+                  <Receipt className="w-3.5 h-3.5 text-purple-600" />
+                  <span className="font-semibold text-slate-700">Billing:</span>
+                  <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                    vehicle.paymentStatus === 'SETTLED'
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      : vehicle.paymentStatus === 'REFUND_DUE'
+                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                      : 'bg-amber-100 text-amber-900 border border-amber-300'
+                  }`}>
+                    {vehicle.paymentStatus === 'SETTLED'
+                      ? `Settled: ₹${(vehicle.totalCost || 0).toLocaleString('en-IN')}`
+                      : vehicle.paymentStatus === 'REFUND_DUE'
+                      ? `Refund: ₹${(vehicle.balanceAmount || 0).toLocaleString('en-IN')} (Adv: ₹${(vehicle.amountReceived || 0).toLocaleString('en-IN')})`
+                      : `Due: ₹${(vehicle.balanceAmount || 0).toLocaleString('en-IN')} (Adv: ₹${(vehicle.amountReceived || 0).toLocaleString('en-IN')})`}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -462,6 +485,91 @@ export default function VehicleDetailPage() {
               <span className="text-slate-400 font-medium block">Engine / Motor Number</span>
               <span className="font-mono font-bold text-slate-900 mt-0.5 block">
                 {vehicle.engineNumber || 'N/A'}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 2.5 FINANCIAL & BILLING OVERVIEW CARD */}
+      <Card className="border-purple-200/90 bg-gradient-to-br from-purple-50/50 via-white to-indigo-50/30 shadow-2xs">
+        <CardHeader className="py-3.5 px-5 bg-white/70 border-b border-purple-100 flex flex-row items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center shadow-2xs">
+              <Receipt className="w-4 h-4" />
+            </div>
+            <div>
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-purple-950">
+                Financial Tracking &amp; Payment Status (ബില്ലിംഗ് &amp; അഡ്വാൻസ് വിവരങ്ങൾ)
+              </CardTitle>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Service fees, initial advance tokens, and balance reconciliation
+              </p>
+            </div>
+          </div>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setIsEditVehicleModalOpen(true)}
+            className="h-8 px-3 text-xs font-bold text-purple-700 bg-purple-50 border-purple-200 hover:bg-purple-100 rounded-xl gap-1.5 shadow-2xs cursor-pointer"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            <span>Update Payment / Advance</span>
+          </Button>
+        </CardHeader>
+        <CardContent className="p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div className="p-3.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-1">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide block">
+                Total / Estimated Cost (ആകെ തുക)
+              </span>
+              <span className="text-xl font-mono font-black text-slate-900 block">
+                {vehicle.totalCost !== undefined ? `₹${vehicle.totalCost.toLocaleString('en-IN')}` : '—'}
+              </span>
+              <span className="text-[10px] text-slate-400 block">Service fee or government charges</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-1">
+              <span className="text-[11px] font-semibold text-purple-600 uppercase tracking-wide block">
+                Advance Received (ലഭിച്ച അഡ്വാൻസ്)
+              </span>
+              <span className="text-xl font-mono font-black text-purple-700 block">
+                {vehicle.amountReceived !== undefined ? `₹${vehicle.amountReceived.toLocaleString('en-IN')}` : '₹0'}
+              </span>
+              <span className="text-[10px] text-slate-400 block">Initial token paid by client</span>
+            </div>
+
+            <div className={`p-3.5 rounded-xl border shadow-2xs space-y-1 ${
+              vehicle.paymentStatus === 'SETTLED'
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                : vehicle.paymentStatus === 'REFUND_DUE'
+                ? 'bg-blue-50 border-blue-300 text-blue-950'
+                : 'bg-amber-50 border-amber-300 text-amber-950'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold block">
+                  {vehicle.paymentStatus === 'SETTLED'
+                    ? 'Payment Settled (പൂർണ്ണമായി ലഭിച്ചു)'
+                    : vehicle.paymentStatus === 'REFUND_DUE'
+                    ? 'Refund to Client (തിരികെ നൽകാനുള്ളത്)'
+                    : 'Balance Due (ബാക്കി ലഭിക്കാനുള്ളത്)'}
+                </span>
+                <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded uppercase bg-white/80 border border-slate-200/50">
+                  {vehicle.paymentStatus ? vehicle.paymentStatus.replace('_', ' ') : 'PENDING'}
+                </span>
+              </div>
+              <span className="text-xl font-mono font-black block">
+                {vehicle.paymentStatus === 'SETTLED'
+                  ? '₹0 (Settled)'
+                  : `₹${(vehicle.balanceAmount || 0).toLocaleString('en-IN')}`}
+              </span>
+              <span className="text-[10px] opacity-80 block">
+                {vehicle.paymentStatus === 'SETTLED'
+                  ? 'All bills completely clear'
+                  : vehicle.paymentStatus === 'REFUND_DUE'
+                  ? 'Return excess advance to client'
+                  : 'Pending to collect from owner'}
               </span>
             </div>
           </div>

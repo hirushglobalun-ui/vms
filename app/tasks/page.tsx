@@ -37,6 +37,8 @@ import {
   Sparkles,
   UserCheck,
   AlertCircle,
+  Receipt,
+  IndianRupee,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -103,9 +105,6 @@ export default function TasksPage() {
   // Filtered task items
   const filteredList = useMemo(() => {
     return filteredTasks.filter((task) => {
-      // Exclude any legacy mock/seed tasks
-      if (/^task_[0-9]{1,3}$/.test(task.id)) return false;
-      if (task.vehicleId && /^veh_[0-9]{1,3}$/.test(task.vehicleId)) return false;
 
       if (statusFilter !== 'ALL' && task.status !== statusFilter) return false;
       if (priorityFilter !== 'ALL' && task.priority !== priorityFilter) return false;
@@ -421,6 +420,53 @@ export default function TasksPage() {
             </div>
           </div>
         )}
+
+        {/* Billing & Advance Status Pill */}
+        <div
+          onClick={() => {
+            setEditingTask(task);
+            setIsTaskModalOpen(true);
+          }}
+          className={`flex items-center justify-between text-xs p-2 rounded-xl border transition-all cursor-pointer group/bill ${
+            task.amountReceived !== undefined || task.estimatedCost !== undefined || task.paymentStatus
+              ? 'bg-purple-50/70 hover:bg-purple-100/80 border-purple-200/80'
+              : 'bg-slate-50/70 hover:bg-purple-50/60 border-dashed border-slate-200 hover:border-purple-300'
+          }`}
+          title="Click to record or update client advance payment"
+        >
+          <div className="flex items-center gap-1.5 font-medium text-slate-700">
+            <Receipt className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+            <span>
+              {task.amountReceived !== undefined ? (
+                <>Adv: <strong className="font-mono text-purple-900 font-bold">₹{task.amountReceived.toLocaleString('en-IN')}</strong></>
+              ) : task.estimatedCost !== undefined ? (
+                <span>Fee: ₹{task.estimatedCost.toLocaleString('en-IN')}</span>
+              ) : (
+                <span className="text-slate-400 group-hover/bill:text-purple-700 font-semibold">+ Record Advance / Payment</span>
+              )}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            {task.paymentStatus === 'SETTLED' ? (
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                Settled
+              </span>
+            ) : task.paymentStatus === 'REFUND_DUE' ? (
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                Refund: ₹{(task.balanceAmount || 0).toLocaleString('en-IN')}
+              </span>
+            ) : task.paymentStatus === 'BALANCE_DUE' ? (
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                Due: ₹{(task.balanceAmount || 0).toLocaleString('en-IN')}
+              </span>
+            ) : (
+              <span className="text-[10px] text-slate-400 group-hover/bill:text-purple-600 font-bold">
+                Edit ₹
+              </span>
+            )}
+          </div>
+        </div>
 
         {/* Footer & Actions */}
         <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
@@ -1062,6 +1108,71 @@ export default function TasksPage() {
                     <div>
                       <span className="text-[10px] text-slate-400 block font-bold uppercase">Email Address</span>
                       <span className="text-slate-700">{client.email || 'Not specified'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Billing & Settlement Breakdown */}
+              {(inspectTask.estimatedCost !== undefined || inspectTask.amountReceived !== undefined || inspectTask.paymentStatus) && (
+                <div className="p-4 rounded-2xl bg-purple-50/50 border border-purple-200/80 space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-purple-100 pb-2">
+                    <span className="text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+                      <Receipt className="w-4 h-4 text-purple-600" />
+                      Billing &amp; Payment Status (പേയ്‌മെന്റ് വിവരങ്ങൾ)
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {inspectTask.paymentStatus === 'SETTLED' ? (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          Fully Settled
+                        </span>
+                      ) : inspectTask.paymentStatus === 'REFUND_DUE' ? (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
+                          Refund Due: ₹{(inspectTask.balanceAmount || 0).toLocaleString('en-IN')}
+                        </span>
+                      ) : inspectTask.paymentStatus === 'BALANCE_DUE' ? (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                          Balance Due: ₹{(inspectTask.balanceAmount || 0).toLocaleString('en-IN')}
+                        </span>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const t = inspectTask;
+                          setInspectTask(null);
+                          setEditingTask(t);
+                          setIsTaskModalOpen(true);
+                        }}
+                        className="px-2 py-0.5 rounded-md text-[10px] font-bold text-purple-700 bg-white border border-purple-200 hover:bg-purple-100 transition-colors shadow-2xs cursor-pointer"
+                      >
+                        Update ₹
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                    <div>
+                      <span className="text-[10px] text-purple-700/70 block font-bold uppercase">Estimated / Total Cost</span>
+                      <strong className="text-slate-900 font-mono">
+                        {inspectTask.estimatedCost !== undefined ? `₹${inspectTask.estimatedCost.toLocaleString('en-IN')}` : 'Not set'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-purple-700/70 block font-bold uppercase">Advance Paid</span>
+                      <strong className="text-slate-900 font-mono">
+                        {inspectTask.amountReceived !== undefined ? `₹${inspectTask.amountReceived.toLocaleString('en-IN')}` : '₹0'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-purple-700/70 block font-bold uppercase">Balance Status</span>
+                      <strong className="text-slate-900">
+                        {inspectTask.paymentStatus === 'SETTLED'
+                          ? 'Settled'
+                          : inspectTask.paymentStatus === 'REFUND_DUE'
+                          ? `Return ₹${(inspectTask.balanceAmount || 0).toLocaleString('en-IN')}`
+                          : `Collect ₹${(inspectTask.balanceAmount || 0).toLocaleString('en-IN')}`}
+                      </strong>
                     </div>
                   </div>
                 </div>
