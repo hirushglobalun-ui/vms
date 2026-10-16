@@ -156,20 +156,71 @@ export function parseRcText(rawText: string): ExtractedRcData {
     detectedFieldsList.push('Registration Number');
   }
 
-  // 2. Chassis Number (VIN - 17 alphanumeric)
-  const exactVin = cleanText.match(/\b([A-HJ-NPR-Z0-9]{17})\b/);
-  if (exactVin && exactVin[1]) {
-    result.chassisNumber = exactVin[1];
-    detectedFieldsList.push('Chassis Number');
-  } else {
-    const chassisMatch = cleanText.match(/(?:CHASSIS\s*(?:NO|NUMBER)?|VIN)[\s:.-]*([A-HJ-NPR-Z0-9]{14,19})/i);
-    if (chassisMatch && chassisMatch[1]) {
-      const vin = chassisMatch[1].replace(/[^A-Z0-9]/g, '');
-      if (vin.length >= 14 && vin.length <= 19) {
-        result.chassisNumber = vin;
-        detectedFieldsList.push('Chassis Number');
+  // 2. Chassis Number (VIN - 14 to 19 alphanumeric chars, typically 17)
+  let foundChassis: string | undefined;
+
+  // 2a. Line-by-line label matching (handles spaces inside VIN like 'MB8DK 11AY P8978120' or next-line values)
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].toUpperCase();
+    if (
+      l.includes('CHASSIS') ||
+      l.includes('CHAS NO') ||
+      l.includes('CH. NO') ||
+      l.includes('CH.NO') ||
+      l.includes('FRAME NO') ||
+      l.includes('VIN NO') ||
+      (l.includes('VIN') && (l.includes('NO') || l.includes('NUMBER') || l.includes(':')))
+    ) {
+      // Check remainder of this line
+      const afterLabel = l.replace(/.*(?:CHASSIS\s*(?:NO|NUM|NUMBER|\.)*|CHAS\s*(?:NO|NUM|\.)*|CH\s*\.?\s*NO\.?|FRAME\s*(?:NO|NUM|\.)*|VIN(?:\s*NO|\s*NUMBER|\.)?)[\s:.-]*/i, '').trim();
+      const cleanedCandidate = afterLabel.replace(/[^A-Z0-9]/g, '');
+      if (cleanedCandidate.length >= 14 && cleanedCandidate.length <= 19 && /[0-9]/.test(cleanedCandidate) && /[A-Z]/.test(cleanedCandidate)) {
+        foundChassis = cleanedCandidate;
+        break;
+      }
+
+      // If not on same line, check next line
+      if (!foundChassis && i + 1 < lines.length) {
+        const nextL = lines[i + 1].toUpperCase().trim();
+        if (!nextL.includes('ENGINE') && !nextL.includes('MOTOR') && !nextL.includes('MAKER') && !nextL.includes('ADDRESS')) {
+          const nextCandidate = nextL.replace(/[^A-Z0-9]/g, '');
+          if (nextCandidate.length >= 14 && nextCandidate.length <= 19 && /[0-9]/.test(nextCandidate) && /[A-Z]/.test(nextCandidate)) {
+            foundChassis = nextCandidate;
+            break;
+          }
+        }
       }
     }
+  }
+
+  // 2b. Global regex matching across cleanText (handles spaces / dashes within VIN)
+  if (!foundChassis) {
+    const globalChassisMatch = cleanText.match(/(?:CHASSIS\s*(?:NO|NUM|NUMBER|\.)*|CHAS\s*(?:NO|NUM|\.)*|FRAME\s*(?:NO|\.)*|VIN)[\s:.-]*([A-Z0-9\s-]{14,24})/i);
+    if (globalChassisMatch && globalChassisMatch[1]) {
+      const stripped = globalChassisMatch[1].replace(/[^A-Z0-9]/g, '');
+      if (stripped.length >= 14 && stripped.length <= 19 && /[0-9]/.test(stripped) && /[A-Z]/.test(stripped)) {
+        foundChassis = stripped;
+      }
+    }
+  }
+
+  // 2c. Standalone exact 17-char VIN matching (allow A-Z0-9 because OCR often reads 0 as O/Q or 1 as I)
+  if (!foundChassis) {
+    const exactVinMatches = cleanText.match(/\b([A-Z0-9]{17})\b/g);
+    if (exactVinMatches) {
+      for (const candidate of exactVinMatches) {
+        // Must contain both digits and letters, and not be pure phone or date
+        if (/[0-9]/.test(candidate) && /[A-Z]/.test(candidate)) {
+          foundChassis = candidate;
+          break;
+        }
+      }
+    }
+  }
+
+  if (foundChassis) {
+    result.chassisNumber = foundChassis;
+    detectedFieldsList.push('Chassis Number');
   }
 
   // 3. Engine / Motor Number
@@ -182,15 +233,26 @@ export function parseRcText(rawText: string): ExtractedRcData {
 
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i].toUpperCase();
-    if (l.includes('ENGINE') || l.includes('MOTOR NO') || l.includes('ENG NO') || l.includes('ENG. NO') || l.includes('MOTOR NUMBER')) {
+    if (
+      l.includes('ENGINE') ||
+      l.includes('MOTOR NO') ||
+      l.includes('ENG NO') ||
+      l.includes('ENG. NO') ||
+      l.includes('E.NO') ||
+      l.includes('E. NO') ||
+      l.includes('MOTOR NUMBER')
+    ) {
       // Look for candidate on the same line after labels (e.g. Engine No / Motor No: AF21ED123456)
-      const cleaned = l.replace(/.*(?:ENGINE\s*(?:NO|NUMBER|\.)*|MOTOR\s*(?:NO|NUMBER|\.)*|ENG\s*(?:NO|NUMBER|\.)*)(?:\s*\/\s*MOTOR\s*(?:NO|NUMBER|\.)*)?[\s:.-]*/i, '').trim();
+      const cleaned = l.replace(/.*(?:ENGINE\s*(?:NO|NUMBER|\.)*|MOTOR\s*(?:NO|NUMBER|\.)*|ENG\s*(?:NO|NUMBER|\.)*|E\s*\.?\s*NO\.?)(?:\s*\/\s*MOTOR\s*(?:NO|NUMBER|\.)*)?[\s:.-]*/i, '').trim();
       const tokens = cleaned.split(/[\s,;:|/]+/);
       for (const t of tokens) {
         const candidate = t.replace(/[^A-Z0-9-]/g, '');
-        if (candidate.length >= 6 && candidate.length <= 18 && !engineBlacklist.has(candidate) && /[0-9]/.test(candidate)) {
-          foundEngine = candidate;
-          break;
+        if (candidate.length >= 5 && candidate.length <= 19 && !engineBlacklist.has(candidate) && /[0-9]/.test(candidate)) {
+          // Ensure it's not the exact same as chassis number
+          if (!result.chassisNumber || candidate !== result.chassisNumber) {
+            foundEngine = candidate;
+            break;
+          }
         }
       }
 
@@ -201,9 +263,11 @@ export function parseRcText(rawText: string): ExtractedRcData {
           const nextTokens = nextL.split(/[\s,;:|/]+/);
           for (const t of nextTokens) {
             const candidate = t.replace(/[^A-Z0-9-]/g, '');
-            if (candidate.length >= 6 && candidate.length <= 18 && !engineBlacklist.has(candidate) && /[0-9]/.test(candidate)) {
-              foundEngine = candidate;
-              break;
+            if (candidate.length >= 5 && candidate.length <= 19 && !engineBlacklist.has(candidate) && /[0-9]/.test(candidate)) {
+              if (!result.chassisNumber || candidate !== result.chassisNumber) {
+                foundEngine = candidate;
+                break;
+              }
             }
           }
         }
@@ -214,9 +278,14 @@ export function parseRcText(rawText: string): ExtractedRcData {
 
   // Direct regex fallback across full cleanText
   if (!foundEngine) {
-    const directMatch = cleanText.match(/(?:ENGINE|MOTOR|ENG)\s*(?:NO|NUM|NUMBER|\.)*(?:\s*\/\s*MOTOR\s*(?:NO|NUM|NUMBER|\.)*)?[\s:.-]*([A-Z0-9-]{6,18})/);
-    if (directMatch && directMatch[1] && !engineBlacklist.has(directMatch[1]) && /[0-9]/.test(directMatch[1])) {
-      foundEngine = directMatch[1];
+    const directMatch = cleanText.match(/(?:ENGINE|MOTOR|ENG|E\.?NO)\s*(?:NO|NUM|NUMBER|\.)*(?:\s*\/\s*MOTOR\s*(?:NO|NUM|NUMBER|\.)*)?[\s:.-]*([A-Z0-9-]{5,19})/i);
+    if (directMatch && directMatch[1]) {
+      const candidate = directMatch[1].replace(/[^A-Z0-9-]/g, '');
+      if (candidate.length >= 5 && candidate.length <= 19 && !engineBlacklist.has(candidate) && /[0-9]/.test(candidate)) {
+        if (!result.chassisNumber || candidate !== result.chassisNumber) {
+          foundEngine = candidate;
+        }
+      }
     }
   }
 
@@ -835,4 +904,108 @@ export async function performRcOcr(
     console.error('OCR Error:', error);
     throw new Error(error?.message || 'Failed to read RC document image. Please upload a clear photo or enter manually.');
   }
+}
+
+/**
+ * Intelligently merges extracted data from Front and Back RC images (or two pages).
+ * Back side usually provides Chassis, Engine, Maker, Model, Vehicle Type, Fuel, Fitness.
+ * Front side usually provides Owner, Registration Number, Reg Date, Address, RTO.
+ */
+export function mergeExtractedRcData(
+  front: ExtractedRcData | null | undefined,
+  back: ExtractedRcData | null | undefined
+): ExtractedRcData {
+  if (!front && !back) return {};
+  if (!front) return back!;
+  if (!back) return front!;
+
+  const mergedList = Array.from(
+    new Set([...(front.detectedFieldsList || []), ...(back.detectedFieldsList || [])])
+  );
+
+  return {
+    registrationNumber: front.registrationNumber || back.registrationNumber,
+    ownerName: front.ownerName || back.ownerName,
+    relationshipName: front.relationshipName || back.relationshipName,
+    ownerAddress: front.ownerAddress || back.ownerAddress,
+    pincode: front.pincode || back.pincode,
+    chassisNumber: back.chassisNumber || front.chassisNumber,
+    engineNumber: back.engineNumber || front.engineNumber,
+    make: back.make || front.make,
+    model: back.model || front.model,
+    variant: back.variant || front.variant,
+    vehicleType: back.vehicleType || front.vehicleType,
+    vehicleClass: back.vehicleClass || front.vehicleClass,
+    fuelType: back.fuelType || front.fuelType,
+    manufacturingYear: back.manufacturingYear || front.manufacturingYear,
+    manufacturingMonthYear: back.manufacturingMonthYear || front.manufacturingMonthYear,
+    registrationDate: front.registrationDate || back.registrationDate,
+    registrationValidity: back.registrationValidity || front.registrationValidity,
+    insuranceValidity: front.insuranceValidity || back.insuranceValidity,
+    pollutionValidity: front.pollutionValidity || back.pollutionValidity,
+    rto: front.rto || back.rto,
+    color: back.color || front.color,
+    bodyType: back.bodyType || front.bodyType,
+    seatingCapacity: back.seatingCapacity || front.seatingCapacity,
+    unladenWeight: back.unladenWeight || front.unladenWeight,
+    cubicCapacity: back.cubicCapacity || front.cubicCapacity,
+    horsepower: back.horsepower || front.horsepower,
+    wheelbase: back.wheelbase || front.wheelbase,
+    cylinders: back.cylinders || front.cylinders,
+    ownerSerial: front.ownerSerial || back.ownerSerial,
+    financier: front.financier || back.financier,
+    emissionNorms: back.emissionNorms || front.emissionNorms,
+    confidenceScore: Math.min(Math.round((mergedList.length / 10) * 100), 99),
+    detectedFieldCount: mergedList.length,
+    detectedFieldsList: mergedList,
+    rawLines: [...(front.rawLines || []), ...(back.rawLines || [])],
+  };
+}
+
+/**
+ * Executes OCR on two RC images (Front & Back) sequentially,
+ * reading both pages and combining all vehicle, compliance, chassis & engine details.
+ */
+export async function performDualRcOcr(
+  frontInput: File | string | null,
+  backInput: File | string | null,
+  onProgress?: (progress: number, status: string) => void
+): Promise<{ data: ExtractedRcData; rawText: string }> {
+  if (!frontInput && !backInput) {
+    throw new Error('Please provide at least one RC document image.');
+  }
+
+  if (frontInput && !backInput) {
+    return performRcOcr(frontInput, onProgress);
+  }
+
+  if (!frontInput && backInput) {
+    return performRcOcr(backInput, onProgress);
+  }
+
+  onProgress?.(10, 'Initializing Dual-Page OCR reader...');
+
+  // Scan Front Side (10% to 50%)
+  const frontRes = await performRcOcr(frontInput!, (pct) => {
+    const adjusted = Math.round(10 + (pct * 0.4));
+    onProgress?.(adjusted, `Scanning Front Side (മുഖഭാഗം)... ${pct}%`);
+  });
+
+  // Scan Back Side (50% to 90%)
+  const backRes = await performRcOcr(backInput!, (pct) => {
+    const adjusted = Math.round(50 + (pct * 0.4));
+    onProgress?.(adjusted, `Scanning Back Side (മറുഭാഗം - ചേസിസ് & എഞ്ചിൻ)... ${pct}%`);
+  });
+
+  onProgress?.(95, 'Synthesizing Front & Back RC data...');
+  const combinedRawText = `--- FRONT SIDE ---\n${frontRes.rawText}\n\n--- BACK SIDE ---\n${backRes.rawText}`;
+  const combinedParse = parseRcText(combinedRawText);
+
+  const merged = mergeExtractedRcData(
+    mergeExtractedRcData(frontRes.data, backRes.data),
+    combinedParse
+  );
+
+  onProgress?.(100, 'Dual-page RC extraction complete!');
+  return { data: merged, rawText: combinedRawText };
 }

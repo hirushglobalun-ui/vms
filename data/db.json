@@ -93,13 +93,15 @@
       "vehicleType": "TWO_WHEELER",
       "fuelType": "PETROL",
       "rto": "KL-53 Perinthalmanna",
+      "chassisNumber": "MB8DK11AYP8978120",
+      "engineNumber": "AF32E8978120",
       "status": "ACTIVE",
       "totalCost": 2200,
       "amountReceived": 1000,
       "balanceAmount": 1200,
       "paymentStatus": "BALANCE_DUE",
       "createdAt": "2026-01-10T11:00:00.000Z",
-      "updatedAt": "2026-01-10T11:00:00.000Z",
+      "updatedAt": "2026-10-15T13:37:16.148Z",
       "createdBy": "user_admin_1"
     },
     {
@@ -113,6 +115,8 @@
       "vehicleType": "PRIVATE_CAR",
       "fuelType": "ELECTRIC",
       "rto": "KL-10 Malappuram",
+      "chassisNumber": "MAT622019N8123456",
+      "engineNumber": "5004123456",
       "status": "ACTIVE",
       "totalCost": 4500,
       "amountReceived": 12500,
@@ -124,6 +128,39 @@
     }
   ],
   "documents": [
+    {
+      "vehicleId": "veh_1",
+      "clientId": "client_1",
+      "documentType": "ROAD_TAX",
+      "reminderDays": 30,
+      "notes": "Renewed. Previous cycle archived to history.",
+      "id": "doc_1792071436147",
+      "status": "ACTIVE",
+      "isHistorical": false,
+      "createdBy": "user_agent_rahman",
+      "createdAt": "2026-10-15T13:37:16.147Z",
+      "updatedAt": "2026-10-15T13:37:16.147Z",
+      "issueDate": "2026-10-15",
+      "expiryDate": "2031-10-05",
+      "amount": 2200,
+      "amountReceived": 1000,
+      "balanceAmount": 1200,
+      "paymentStatus": "BALANCE_DUE"
+    },
+    {
+      "vehicleId": "veh_1",
+      "clientId": "client_1",
+      "documentType": "ROAD_TAX",
+      "reminderDays": 30,
+      "notes": "Road Tax compliance",
+      "id": "doc_1792040823146",
+      "status": "COMPLETED",
+      "isHistorical": true,
+      "createdBy": "user_admin_1",
+      "createdAt": "2026-10-15T05:07:03.146Z",
+      "updatedAt": "2026-10-15T13:37:16.147Z",
+      "expiryDate": "2026-10-06"
+    },
     {
       "vehicleId": "veh_2",
       "clientId": "client_3",
@@ -197,19 +234,6 @@
       "updatedAt": "2026-10-15T05:07:03.260Z"
     },
     {
-      "vehicleId": "veh_1",
-      "clientId": "client_1",
-      "documentType": "ROAD_TAX",
-      "reminderDays": 30,
-      "notes": "Road Tax compliance",
-      "id": "doc_1792040823146",
-      "status": "ACTIVE",
-      "isHistorical": false,
-      "createdBy": "user_admin_1",
-      "createdAt": "2026-10-15T05:07:03.146Z",
-      "updatedAt": "2026-10-15T05:07:03.146Z"
-    },
-    {
       "id": "doc_1",
       "vehicleId": "veh_1",
       "clientId": "client_1",
@@ -254,6 +278,29 @@
   ],
   "tasks": [
     {
+      "id": "task_auto_1792071414809_lk3c5",
+      "clientId": "client_1",
+      "vehicleId": "veh_1",
+      "documentId": "doc_1792040823146",
+      "title": "KL-53-W-8978 - ROAD_TAX Renewal",
+      "description": "Compliance follow-up: ROAD_TAX is OVERDUE. Please contact Sayed Shahloob (9847144556) to arrange renewal quotation and collection.",
+      "assignedTo": "user_agent_rahman",
+      "dueDate": "2026-10-06",
+      "priority": "HIGH",
+      "status": "COMPLETED",
+      "notes": "System generated compliance alert (OVERDUE)",
+      "createdBy": "system",
+      "createdAt": "2026-10-15T13:36:54.810Z",
+      "updatedAt": "2026-10-15T13:37:16.149Z",
+      "completedAt": "2026-10-15T13:37:16.149Z",
+      "completedBy": "user_agent_rahman",
+      "completionNotes": "Renewal completed with new expiry: 2031-10-05",
+      "estimatedCost": 2200,
+      "amountReceived": 1000,
+      "balanceAmount": 1200,
+      "paymentStatus": "BALANCE_DUE"
+    },
+    {
       "id": "task_auto_1792041557814_xaium",
       "clientId": "client_3",
       "vehicleId": "veh_2",
@@ -295,31 +342,18 @@
       "createdBy": "user_admin_1"
     }
   ],
-  "notifications": [
-    {
-      "id": "notif_1792041557814_agent_0",
-      "userId": "user_agent_rahman",
-      "title": "Renewal Assigned: KL-10-AZ-1234",
-      "message": "ROAD_TAX is OVERDUE (Expires: 2026-10-07). Immediate follow-up required.",
-      "type": "TASK_ASSIGNED",
-      "relatedVehicleId": "veh_2",
-      "relatedTaskId": "task_auto_1792041557814_xaium",
-      "isRead": false,
-      "createdAt": "2026-10-15T05:19:17.814Z"
-    },
-    {
-      "id": "notif_1792041557814_admin_1",
-      "userId": "user_admin_1",
-      "title": "Compliance Due: KL-10-AZ-1234",
-      "message": "ROAD_TAX is OVERDUE. Assigned to Rahman (Agent).",
-      "type": "OVERDUE",
-      "relatedVehicleId": "veh_2",
-      "relatedTaskId": "task_auto_1792041557814_xaium",
-      "isRead": false,
-      "createdAt": "2026-10-15T05:19:17.814Z"
-    }
-  ],
+  "notifications": [],
   "activityLogs": [
+    {
+      "id": "log_email_1792071414810_0",
+      "userId": "system",
+      "userName": "Alert Engine",
+      "action": "EMAIL_DISPATCHED",
+      "entityType": "DOCUMENT",
+      "entityId": "doc_1792040823146",
+      "description": "Dispatched renewal alert emails to Admin (admin@apexmotors.com), Agent (rahman@apexmotors.com), and Client (sayed@gmail.com) for KL-53-W-8978 ROAD_TAX.",
+      "createdAt": "2026-10-15T13:36:54.810Z"
+    },
     {
       "id": "log_email_1792041557814_0",
       "userId": "system",

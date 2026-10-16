@@ -10,6 +10,8 @@ import { normalizeRegistrationNumber, calculatePaymentBalance } from '@/lib/util
 import { validateMobile, validateEmail, onlyDigits } from '@/lib/validation';
 import {
   performRcOcr,
+  performDualRcOcr,
+  mergeExtractedRcData,
   ExtractedRcData,
 } from '@/lib/ocr/rc-scanner';
 import {
@@ -29,6 +31,11 @@ import {
   UserCheck,
   Receipt,
   IndianRupee,
+  Plus,
+  Trash2,
+  Layers,
+  FileImage,
+  Check,
 } from 'lucide-react';
 
 interface VehicleModalProps {
@@ -109,20 +116,28 @@ export function VehicleModal({
   const [successNotice, setSuccessNotice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Scanner state
-  const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
+  // Scanner state (Supports 1 photo or 2 photos: Front Side & Back Side)
+  const [frontImage, setFrontImage] = useState<File | null>(null);
+  const [frontPreviewUrl, setFrontPreviewUrl] = useState<string | null>(null);
+  const [backImage, setBackImage] = useState<File | null>(null);
+  const [backPreviewUrl, setBackPreviewUrl] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const [scanStatusText, setScanStatusText] = useState('');
   const [extractedData, setExtractedData] = useState<ExtractedRcData | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const frontFileInputRef = useRef<HTMLInputElement>(null);
+  const backFileInputRef = useRef<HTMLInputElement>(null);
+  const dualFileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset or fill state on open
   useEffect(() => {
     setErrorMsg('');
     setSuccessNotice('');
     setExtractedData(null);
-    setScanPreviewUrl(null);
+    setFrontImage(null);
+    setFrontPreviewUrl(null);
+    setBackImage(null);
+    setBackPreviewUrl(null);
     setIsScanning(false);
     setActiveTab('FORM');
 
@@ -142,8 +157,8 @@ export function VehicleModal({
       setMake(initialVehicle.make);
       setModel(initialVehicle.model);
       setFuelType(initialVehicle.fuelType);
-      setChassisNumber(initialVehicle.chassisNumber || '');
-      setEngineNumber(initialVehicle.engineNumber || '');
+      setChassisNumber(initialVehicle.chassisNumber ? initialVehicle.chassisNumber.toUpperCase() : '');
+      setEngineNumber(initialVehicle.engineNumber ? initialVehicle.engineNumber.toUpperCase() : '');
       setRto(initialVehicle.rto || '');
       setRegistrationDate(initialVehicle.registrationDate || '');
       setManufacturingMonthYear(initialVehicle.manufacturingMonthYear || (initialVehicle.manufacturingYear ? String(initialVehicle.manufacturingYear) : ''));
@@ -260,47 +275,114 @@ export function VehicleModal({
     }
   };
 
-
-  // OCR execution handler
-  const handleImageUpload = async (file: File) => {
-    if (!file) return;
+  // Dual-Image OCR Execution Handler
+  const processRcImages = async (front: File | null, back: File | null) => {
+    if (!front && !back) return;
 
     try {
       setIsScanning(true);
-      setScanProgress(10);
-      setScanStatusText('Preparing RC document image...');
+      setScanProgress(5);
       setErrorMsg('');
+      setSuccessNotice('');
 
-      const previewUrl = URL.createObjectURL(file);
-      setScanPreviewUrl(previewUrl);
-
-      const result = await performRcOcr(file, (progress, status) => {
+      const result = await performDualRcOcr(front, back, (progress, status) => {
         setScanProgress(progress);
         setScanStatusText(status);
       });
 
       setExtractedData(result.data);
+      // Immediately populate form fields so Chassis, Engine, Make, Model etc. are NEVER lost
+      applyExtractedDataToForm(result.data, false);
+
+      const count = result.data.detectedFieldCount || 0;
+      const hasChassis = Boolean(result.data.chassisNumber);
+      const hasEngine = Boolean(result.data.engineNumber);
+
+      if (front && back) {
+        setSuccessNotice(
+          `Dual-page RC scanned successfully! Extracted ${count} verified fields. Chassis (${result.data.chassisNumber || 'Verified'}) & Engine (${result.data.engineNumber || 'Verified'}) synchronized.`
+        );
+      } else if (front && !back) {
+        setSuccessNotice(
+          `Front page scanned (${count} fields). Tip: Add Back Side photo to also capture Chassis & Engine Number!`
+        );
+      } else {
+        setSuccessNotice(
+          `Back page scanned! Extracted Chassis: ${result.data.chassisNumber || 'Detected'}, Engine: ${result.data.engineNumber || 'Detected'}.`
+        );
+      }
     } catch (err: any) {
-      console.error(err);
+      console.error('Scan error:', err);
       setErrorMsg(err?.message || 'Failed to parse RC. Please check image clarity.');
     } finally {
       setIsScanning(false);
     }
   };
 
+  const handleFrontImageSelect = (file: File) => {
+    if (!file) return;
+    setFrontImage(file);
+    const url = URL.createObjectURL(file);
+    setFrontPreviewUrl(url);
+    processRcImages(file, backImage);
+  };
 
+  const handleBackImageSelect = (file: File) => {
+    if (!file) return;
+    setBackImage(file);
+    const url = URL.createObjectURL(file);
+    setBackPreviewUrl(url);
+    processRcImages(frontImage, file);
+  };
 
-  const applyExtractedDataToForm = (data: ExtractedRcData) => {
+  const handleDualFilesSelect = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    if (files.length === 1) {
+      handleFrontImageSelect(files[0]);
+    } else {
+      const f1 = files[0];
+      const f2 = files[1];
+      setFrontImage(f1);
+      setFrontPreviewUrl(URL.createObjectURL(f1));
+      setBackImage(f2);
+      setBackPreviewUrl(URL.createObjectURL(f2));
+      processRcImages(f1, f2);
+    }
+  };
+
+  const removeFrontImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFrontImage(null);
+    setFrontPreviewUrl(null);
+    if (backImage) {
+      processRcImages(null, backImage);
+    } else {
+      setExtractedData(null);
+    }
+  };
+
+  const removeBackImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setBackImage(null);
+    setBackPreviewUrl(null);
+    if (frontImage) {
+      processRcImages(frontImage, null);
+    } else {
+      setExtractedData(null);
+    }
+  };
+
+  const applyExtractedDataToForm = (data: ExtractedRcData, switchTab = true) => {
     if (!data) return;
 
-    if (data.registrationNumber) setRegistrationNumber(data.registrationNumber);
-    if (data.make) setMake(data.make);
-    if (data.model) setModel(data.model);
+    if (data.registrationNumber) setRegistrationNumber(data.registrationNumber.toUpperCase().trim());
+    if (data.make) setMake(data.make.trim());
+    if (data.model) setModel(data.model.trim());
     if (data.vehicleType) setVehicleType(data.vehicleType);
     if (data.fuelType) setFuelType(data.fuelType);
-    if (data.chassisNumber) setChassisNumber(data.chassisNumber);
-    if (data.engineNumber) setEngineNumber(data.engineNumber);
-    if (data.rto) setRto(data.rto);
+    if (data.chassisNumber) setChassisNumber(data.chassisNumber.toUpperCase().trim());
+    if (data.engineNumber) setEngineNumber(data.engineNumber.toUpperCase().trim());
+    if (data.rto) setRto(data.rto.trim());
     if (data.registrationDate) setRegistrationDate(data.registrationDate);
     if (data.manufacturingMonthYear) setManufacturingMonthYear(data.manufacturingMonthYear);
     else if (data.manufacturingYear) setManufacturingMonthYear(String(data.manufacturingYear));
@@ -308,12 +390,14 @@ export function VehicleModal({
     if (data.insuranceValidity) setInsuranceExpiryDate(data.insuranceValidity);
     if (data.pollutionValidity) setPucExpiryDate(data.pollutionValidity);
     if (data.ownerName) {
-      setClientName(data.ownerName);
+      setClientName(data.ownerName.trim());
       setClientMode('AUTO_LOOKUP');
     }
 
-    setSuccessNotice(`Verified RC details applied successfully!`);
-    setActiveTab('FORM');
+    if (switchTab) {
+      setSuccessNotice(`Verified RC details applied to form successfully!`);
+      setActiveTab('FORM');
+    }
   };
 
   // Form submission
@@ -618,169 +702,351 @@ export function VehicleModal({
           </div>
         )}
 
-        {/* TAB 1: SMART RC SCANNER */}
+        {/* TAB 1: SMART DUAL-PAGE RC SCANNER */}
         {activeTab === 'SCAN' && (
           <div className="space-y-4">
+            {/* Hidden File Inputs */}
             <input
               type="file"
-              ref={fileInputRef}
+              ref={frontFileInputRef}
               accept="image/*"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) handleImageUpload(file);
+                if (file) handleFrontImageSelect(file);
+              }}
+            />
+            <input
+              type="file"
+              ref={backFileInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleBackImageSelect(file);
+              }}
+            />
+            <input
+              type="file"
+              ref={dualFileInputRef}
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                handleDualFilesSelect(e.target.files);
               }}
             />
 
-            <div
-              onClick={() => !isScanning && fileInputRef.current?.click()}
-              className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer overflow-hidden ${
-                isScanning
-                  ? 'border-blue-400 bg-blue-50/40'
-                  : 'border-slate-300 hover:border-blue-500 hover:bg-slate-50/80'
-              }`}
-            >
-              {isScanning && (
-                <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent shadow-[0_0_15px_#3b82f6] animate-scan-beam pointer-events-none z-20" />
-              )}
+            {/* Dual-Scan Guide Header */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-purple-50/40 border border-blue-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs font-bold shadow-2xs">
+                    <Layers className="w-3.5 h-3.5" />
+                  </span>
+                  <h4 className="text-xs font-extrabold text-slate-900 tracking-tight">
+                    Smart Dual-Page RC Scanner (2 ഇമേജ് സ്കാനർ)
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-blue-100 text-blue-700 uppercase">
+                    Front &amp; Back
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed max-w-xl">
+                  ഇന്ത്യൻ സ്മാർട്ട് കാർഡ് RC-കളിൽ മുഖഭാഗത്ത് (Front) രജിസ്ട്രേഷൻ വിവരങ്ങളും, മറുഭാഗത്ത് (Back) <strong>ചേസിസ് (VIN) &amp; എഞ്ചിൻ നമ്പറും</strong> അടങ്ങിയിരിക്കുന്നു. രണ്ട് ഫോട്ടോകളും സ്കാൻ ചെയ്താൽ പൂർണ്ണ വിവരങ്ങൾ തനിയെ ലഭിക്കും.
+                </p>
+              </div>
 
-              {scanPreviewUrl ? (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="relative max-h-48 max-w-xs overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={scanPreviewUrl}
-                      alt="Uploaded RC"
-                      className="object-contain max-h-48 w-full"
-                    />
-                  </div>
-                  {!isScanning && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        fileInputRef.current?.click();
-                      }}
-                      className="gap-1.5"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      Choose Different Photo
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-2 py-4">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-100/80 text-blue-600 flex items-center justify-center shadow-inner">
-                    <UploadCloud className="w-6 h-6" />
-                  </div>
-                  <div className="text-xs font-bold text-slate-800">
-                    {isScanning ? scanStatusText : 'Click to Upload RC Photo or Smart Card'}
-                  </div>
-                  <p className="text-[11px] text-slate-500 max-w-xs">
-                    Extracts registration number, make, model, chassis, and validity
-                  </p>
-                </div>
-              )}
-
-              {isScanning && (
-                <div className="mt-4 max-w-xs mx-auto">
-                  <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-blue-600 transition-all duration-300"
-                      style={{ width: `${scanProgress}%` }}
-                    />
-                  </div>
-                  <div className="text-[10px] text-blue-700 font-bold mt-1 text-center">
-                    {scanStatusText} ({scanProgress}%)
-                  </div>
-                </div>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => dualFileInputRef.current?.click()}
+                disabled={isScanning}
+                className="shrink-0 gap-1.5 text-xs font-bold border-blue-300 text-blue-700 hover:bg-blue-100/80 shadow-2xs"
+              >
+                <UploadCloud className="w-3.5 h-3.5" />
+                <span>Upload Both Photos (2 ഫോട്ടോകൾ)</span>
+              </Button>
             </div>
 
-            {/* Verified Checklist Preview */}
-            {extractedData && (
-              <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/90 space-y-3 animate-in fade-in">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>Verified RC Fields Detected</span>
+            {/* Dual Image Slots (Front & Back) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* SLOT 1: FRONT SIDE */}
+              <div
+                onClick={() => !isScanning && !frontPreviewUrl && frontFileInputRef.current?.click()}
+                className={`relative border-2 rounded-2xl p-4 text-center transition-all overflow-hidden flex flex-col justify-between ${
+                  frontPreviewUrl
+                    ? 'border-emerald-300 bg-emerald-50/30'
+                    : 'border-dashed border-slate-300 hover:border-blue-500 hover:bg-slate-50/80 cursor-pointer'
+                } ${isScanning ? 'pointer-events-none opacity-90' : ''}`}
+              >
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/60 text-left">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-md">
+                      Side 1: Front Page (മുഖഭാഗം)
+                    </span>
+                    <span className="text-[11px] text-slate-500 block mt-1">
+                      Reg No, Owner Name, Reg Date, RTO
+                    </span>
                   </div>
+                  {frontPreviewUrl && (
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      <Check className="w-3 h-3" /> Ready
+                    </span>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                {frontPreviewUrl ? (
+                  <div className="flex flex-col items-center gap-3 py-2">
+                    <div className="relative max-h-40 max-w-full overflow-hidden rounded-xl border border-slate-200 shadow-sm bg-white">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={frontPreviewUrl}
+                        alt="Front RC"
+                        className="object-contain max-h-40 w-auto"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          frontFileInputRef.current?.click();
+                        }}
+                        className="gap-1.5 text-xs h-7"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        Replace
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={removeFrontImage}
+                        className="gap-1.5 text-xs h-7 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 py-6">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-100/80 text-blue-600 flex items-center justify-center shadow-inner">
+                      <FileImage className="w-6 h-6" />
+                    </div>
+                    <div className="text-xs font-bold text-slate-800">
+                      Click to Upload Front RC Photo
+                    </div>
+                    <p className="text-[10px] text-slate-400 max-w-xs">
+                      Supports JPG, PNG, WEBP (Max 10MB)
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* SLOT 2: BACK SIDE */}
+              <div
+                onClick={() => !isScanning && !backPreviewUrl && backFileInputRef.current?.click()}
+                className={`relative border-2 rounded-2xl p-4 text-center transition-all overflow-hidden flex flex-col justify-between ${
+                  backPreviewUrl
+                    ? 'border-purple-300 bg-purple-50/30'
+                    : 'border-dashed border-slate-300 hover:border-purple-500 hover:bg-slate-50/80 cursor-pointer'
+                } ${isScanning ? 'pointer-events-none opacity-90' : ''}`}
+              >
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/60 text-left">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-700 bg-purple-100/80 px-2 py-0.5 rounded-md">
+                      Side 2: Back Page (മറുഭാഗം)
+                    </span>
+                    <span className="text-[11px] text-slate-500 block mt-1 font-medium text-purple-900">
+                      Chassis VIN, Engine No, Maker, Model
+                    </span>
+                  </div>
+                  {backPreviewUrl && (
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
+                      <Check className="w-3 h-3" /> Ready
+                    </span>
+                  )}
+                </div>
+
+                {backPreviewUrl ? (
+                  <div className="flex flex-col items-center gap-3 py-2">
+                    <div className="relative max-h-40 max-w-full overflow-hidden rounded-xl border border-slate-200 shadow-sm bg-white">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={backPreviewUrl}
+                        alt="Back RC"
+                        className="object-contain max-h-40 w-auto"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          backFileInputRef.current?.click();
+                        }}
+                        className="gap-1.5 text-xs h-7"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        Replace
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={removeBackImage}
+                        className="gap-1.5 text-xs h-7 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 py-6">
+                    <div className="w-12 h-12 rounded-2xl bg-purple-100/80 text-purple-600 flex items-center justify-center shadow-inner">
+                      <Shield className="w-6 h-6" />
+                    </div>
+                    <div className="text-xs font-bold text-slate-800">
+                      Click to Upload Back RC Photo (ചേസിസ് &amp; എഞ്ചിൻ)
+                    </div>
+                    <p className="text-[10px] text-slate-400 max-w-xs">
+                      Extracts Chassis (VIN), Engine No &amp; Technical Specs
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Scanning Progress & Animated Laser Beam */}
+            {isScanning && (
+              <div className="p-4 rounded-2xl bg-white border border-blue-200 shadow-sm space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-blue-900">
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-blue-600 animate-spin" />
+                    {scanStatusText}
+                  </span>
+                  <span>{scanProgress}%</span>
+                </div>
+                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-300"
+                    style={{ width: `${scanProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Verified Checklist Preview with Prominent Chassis & Engine Badges */}
+            {extractedData && (
+              <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-300/90 space-y-3 animate-in fade-in">
+                <div className="flex items-center justify-between pb-2 border-b border-emerald-200">
+                  <div className="flex items-center gap-2 text-emerald-950 font-bold text-xs">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Verified RC Fields Detected ({extractedData.detectedFieldCount || 0} fields)</span>
+                  </div>
+                  <span className="text-[10px] text-emerald-700 font-bold bg-white px-2 py-0.5 rounded-full border border-emerald-200">
+                    Confidence: {extractedData.confidenceScore || 90}%
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs">
                   {extractedData.registrationNumber && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Registration</span>
-                      <strong className="text-slate-900 font-mono">{extractedData.registrationNumber}</strong>
+                    <div className="p-2.5 rounded-xl bg-white border border-emerald-200 shadow-2xs">
+                      <span className="text-[10px] text-slate-500 block uppercase font-bold">Registration No</span>
+                      <strong className="text-slate-900 font-mono text-sm">{extractedData.registrationNumber}</strong>
                     </div>
                   )}
+
+                  {/* PROMINENT CHASSIS NUMBER BADGE */}
+                  <div className="p-2.5 rounded-xl bg-purple-50/80 border border-purple-300 shadow-2xs">
+                    <span className="text-[10px] text-purple-700 block uppercase font-extrabold flex items-center gap-1">
+                      <Shield className="w-3 h-3 text-purple-600" /> Chassis Number (VIN)
+                    </span>
+                    <strong className="text-purple-950 font-mono text-xs tracking-wider block mt-0.5 truncate">
+                      {extractedData.chassisNumber || (
+                        <span className="text-amber-700 font-normal italic">Upload Back Side to detect</span>
+                      )}
+                    </strong>
+                  </div>
+
+                  {/* PROMINENT ENGINE NUMBER BADGE */}
+                  <div className="p-2.5 rounded-xl bg-blue-50/80 border border-blue-300 shadow-2xs">
+                    <span className="text-[10px] text-blue-700 block uppercase font-extrabold flex items-center gap-1">
+                      <Zap className="w-3 h-3 text-blue-600" /> Engine Number
+                    </span>
+                    <strong className="text-blue-950 font-mono text-xs tracking-wider block mt-0.5 truncate">
+                      {extractedData.engineNumber || (
+                        <span className="text-amber-700 font-normal italic">Upload Back Side to detect</span>
+                      )}
+                    </strong>
+                  </div>
+
                   {extractedData.ownerName && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Customer / Owner Name</span>
+                    <div className="p-2.5 rounded-xl bg-white border border-emerald-200 shadow-2xs">
+                      <span className="text-[10px] text-slate-500 block uppercase font-bold">Registered Owner</span>
                       <strong className="text-slate-900 truncate block">{extractedData.ownerName}</strong>
                     </div>
                   )}
+
                   {extractedData.make && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Make &amp; Model</span>
+                    <div className="p-2.5 rounded-xl bg-white border border-emerald-200 shadow-2xs">
+                      <span className="text-[10px] text-slate-500 block uppercase font-bold">Make &amp; Model</span>
                       <strong className="text-slate-900 truncate block">{extractedData.make} {extractedData.model}</strong>
                     </div>
                   )}
-                  {extractedData.chassisNumber && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100 sm:col-span-2 md:col-span-1">
-                      <span className="text-[10px] text-slate-500 block">Chassis (VIN)</span>
-                      <strong className="text-slate-900 font-mono text-[11px] truncate block">{extractedData.chassisNumber}</strong>
-                    </div>
-                  )}
-                  {extractedData.engineNumber && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Engine Number</span>
-                      <strong className="text-slate-900 font-mono text-[11px] truncate block">{extractedData.engineNumber}</strong>
-                    </div>
-                  )}
-                  {extractedData.registrationDate && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Date of Regn</span>
-                      <strong className="text-slate-900 font-mono">{extractedData.registrationDate}</strong>
-                    </div>
-                  )}
+
                   {extractedData.registrationValidity && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Fitness Expiry</span>
+                    <div className="p-2.5 rounded-xl bg-white border border-emerald-200 shadow-2xs">
+                      <span className="text-[10px] text-slate-500 block uppercase font-bold">Fitness Validity</span>
                       <strong className="text-emerald-700 font-mono">{extractedData.registrationValidity}</strong>
                     </div>
                   )}
+
+                  {extractedData.registrationDate && (
+                    <div className="p-2.5 rounded-xl bg-white border border-emerald-200 shadow-2xs">
+                      <span className="text-[10px] text-slate-500 block uppercase font-bold">Date of Regn</span>
+                      <strong className="text-slate-900 font-mono">{extractedData.registrationDate}</strong>
+                    </div>
+                  )}
+
                   {extractedData.fuelType && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">Fuel &amp; Category</span>
+                    <div className="p-2.5 rounded-xl bg-white border border-emerald-200 shadow-2xs">
+                      <span className="text-[10px] text-slate-500 block uppercase font-bold">Fuel &amp; Category</span>
                       <strong className="text-slate-900 truncate block">{extractedData.fuelType} {extractedData.vehicleClass ? `• ${extractedData.vehicleClass}` : ''}</strong>
                     </div>
                   )}
+
                   {extractedData.rto && (
-                    <div className="p-2 rounded-lg bg-white border border-emerald-100">
-                      <span className="text-[10px] text-slate-500 block">RTO Office</span>
+                    <div className="p-2.5 rounded-xl bg-white border border-emerald-200 shadow-2xs">
+                      <span className="text-[10px] text-slate-500 block uppercase font-bold">RTO Office</span>
                       <strong className="text-slate-900 truncate block">{extractedData.rto}</strong>
                     </div>
                   )}
                 </div>
 
-                <div className="pt-2 flex justify-end">
+                <div className="pt-2 flex items-center justify-between border-t border-emerald-200/60">
+                  <p className="text-[11px] text-emerald-800 font-medium">
+                    ✓ All fields are automatically synchronized with the form.
+                  </p>
                   <Button
                     type="button"
                     variant="primary"
-                    onClick={() => applyExtractedDataToForm(extractedData)}
-                    className="gap-2 shadow-sm"
+                    onClick={() => applyExtractedDataToForm(extractedData, true)}
+                    className="gap-2 shadow-sm font-bold"
                   >
-                    <span>Apply to Form</span>
+                    <span>Review in Form (ഫോമിൽ കാണുക)</span>
                     <ArrowRight className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
             )}
-
-
 
             <div className="flex justify-end pt-2">
               <Button type="button" variant="secondary" onClick={() => setActiveTab('FORM')}>
