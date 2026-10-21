@@ -289,15 +289,15 @@ export async function completeRenewalCycleDoc(
 
   // 1. Update old document to completed historical record
   const oldRef = doc(db, 'vehicleDocuments', oldDoc.id);
-  await updateDoc(oldRef, {
+  await setDoc(oldRef, cleanFirestoreData({
     isHistorical: true,
     status: 'COMPLETED',
     updatedAt: new Date().toISOString(),
-  });
+  }), { merge: true });
 
   // 2. Create new active cycle record
   const newStatus = calculateRenewalStatus(newDetails.newExpiryDate, oldDoc.reminderDays, false);
-  const newDocRef = await addDoc(collection(db, 'vehicleDocuments'), {
+  const newDocRef = await addDoc(collection(db, 'vehicleDocuments'), cleanFirestoreData({
     vehicleId: oldDoc.vehicleId,
     clientId: oldDoc.clientId,
     documentType: oldDoc.documentType,
@@ -320,18 +320,18 @@ export async function completeRenewalCycleDoc(
     createdBy: userId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  });
+  }));
 
   // 3. Complete linked task if provided
   if (linkedTaskId) {
     const taskRef = doc(db, 'tasks', linkedTaskId);
-    await updateDoc(taskRef, {
+    await setDoc(taskRef, cleanFirestoreData({
       status: 'COMPLETED',
       completedAt: new Date().toISOString(),
       completedBy: userId,
       completionNotes: `Renewal completed with new expiry: ${newDetails.newExpiryDate}`,
       updatedAt: new Date().toISOString(),
-    });
+    }), { merge: true });
   }
 
   // 4. Log audit entry
@@ -418,10 +418,10 @@ export async function updateTaskDoc(
 ): Promise<void> {
   if (!isFirebaseConfigured || !db) throw new Error('Firestore not configured.');
   const ref = doc(db, 'tasks', taskId);
-  await updateDoc(ref, {
+  await setDoc(ref, cleanFirestoreData({
     ...updates,
     updatedAt: new Date().toISOString(),
-  });
+  }), { merge: true });
 }
 
 export async function completeTaskDoc(
@@ -431,13 +431,13 @@ export async function completeTaskDoc(
 ): Promise<void> {
   if (!isFirebaseConfigured || !db) throw new Error('Firestore not configured.');
   const ref = doc(db, 'tasks', taskId);
-  await updateDoc(ref, {
+  await setDoc(ref, cleanFirestoreData({
     status: 'COMPLETED',
     completedAt: new Date().toISOString(),
     completedBy: userId,
     completionNotes: completionNotes || 'Marked completed.',
     updatedAt: new Date().toISOString(),
-  });
+  }), { merge: true });
 }
 
 export async function deleteTaskDoc(taskId: string): Promise<void> {

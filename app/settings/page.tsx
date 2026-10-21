@@ -22,6 +22,7 @@ import {
   Lock,
 } from 'lucide-react';
 import Link from 'next/link';
+import { validateEmail, validateMobile, validateName, onlyDigits } from '@/lib/validation';
 
 export default function SettingsPage() {
   const { currentUser, settings, updateSettings, updateUserProfile } = useApp();
@@ -61,11 +62,30 @@ export default function SettingsPage() {
   const [companyAddress, setCompanyAddress] = useState(settings.companyAddress);
   const [defaultReminderDays, setDefaultReminderDays] = useState(settings.defaultReminderDays);
   const [settingsSuccess, setSettingsSuccess] = useState(false);
+  const [companyError, setCompanyError] = useState('');
 
   // Handle updating user profile & login credentials
   const handleSaveCredentials = (e: React.FormEvent) => {
     e.preventDefault();
     setCredentialError('');
+
+    const nameVal = validateName(userName, 'Staff name');
+    if (!nameVal.isValid) {
+      setCredentialError(nameVal.error || 'Please enter a valid name.');
+      return;
+    }
+
+    const emailVal = validateEmail(userEmail, true);
+    if (!emailVal.isValid) {
+      setCredentialError(emailVal.error || 'Please enter a valid email format.');
+      return;
+    }
+
+    const mobileVal = validateMobile(userMobile, 'Staff mobile number', true);
+    if (!mobileVal.isValid) {
+      setCredentialError(mobileVal.error || 'Please enter a valid 10-digit mobile number.');
+      return;
+    }
 
     if (newPassword && newPassword !== confirmPassword) {
       setCredentialError('New password and confirmation do not match.');
@@ -79,8 +99,8 @@ export default function SettingsPage() {
 
     updateUserProfile({
       name: userName.trim(),
-      email: userEmail.trim(),
-      mobile: userMobile.trim(),
+      email: userEmail.trim().toLowerCase(),
+      mobile: mobileVal.cleaned,
     });
 
     setCredentialSuccess(true);
@@ -92,10 +112,24 @@ export default function SettingsPage() {
   // Handle updating company business profile
   const handleSaveCompany = (e: React.FormEvent) => {
     e.preventDefault();
+    setCompanyError('');
+
+    const nameVal = validateName(companyName, 'Company / Agency name');
+    if (!nameVal.isValid) {
+      setCompanyError(nameVal.error || 'Please enter a valid company name.');
+      return;
+    }
+
+    const mobileVal = validateMobile(companyMobile, 'Agency contact mobile', true);
+    if (!mobileVal.isValid) {
+      setCompanyError(mobileVal.error || 'Please enter a valid 10-digit agency mobile number.');
+      return;
+    }
+
     updateSettings({
-      companyName,
-      companyMobile,
-      companyAddress,
+      companyName: companyName.trim(),
+      companyMobile: mobileVal.cleaned,
+      companyAddress: companyAddress.trim(),
       defaultReminderDays: Number(defaultReminderDays) || 30,
     });
     setSettingsSuccess(true);
@@ -152,26 +186,43 @@ export default function SettingsPage() {
                 label="Full Name"
                 required
                 value={userName}
-                onChange={(e) => setUserName(e.target.value)}
+                onChange={(e) => {
+                  setUserName(e.target.value);
+                  if (credentialError) setCredentialError('');
+                }}
                 placeholder="e.g. Anas"
               />
 
-              <Input
-                label="Login Email Address"
-                type="email"
-                required
-                value={userEmail}
-                onChange={(e) => setUserEmail(e.target.value)}
-                placeholder="e.g. anas@apexmotors.com"
-              />
+              <div>
+                <Input
+                  label="Login Email Address"
+                  type="email"
+                  required
+                  value={userEmail}
+                  onChange={(e) => {
+                    setUserEmail(e.target.value);
+                    if (credentialError) setCredentialError('');
+                  }}
+                  placeholder="e.g. anas@apexmotors.com"
+                />
+                <span className="text-[10px] text-slate-400 mt-0.5 block">Valid email format</span>
+              </div>
 
-              <Input
-                label="Staff Mobile Number"
-                required
-                value={userMobile}
-                onChange={(e) => setUserMobile(e.target.value)}
-                placeholder="e.g. +91 98470 00001"
-              />
+              <div>
+                <Input
+                  label="Staff Mobile Number"
+                  required
+                  type="tel"
+                  value={userMobile}
+                  onChange={(e) => {
+                    setUserMobile(onlyDigits(e.target.value, 10));
+                    if (credentialError) setCredentialError('');
+                  }}
+                  placeholder="e.g. 9847000001"
+                  className="font-mono"
+                />
+                <span className="text-[10px] text-slate-400 mt-0.5 block">10 digits, numbers only</span>
+              </div>
             </div>
 
             {/* Change Password / Credentials */}
@@ -249,20 +300,39 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {companyError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold flex items-center gap-2 animate-in fade-in">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0" />
+                {companyError}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Company / Agency Name"
                 required
                 value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
+                onChange={(e) => {
+                  setCompanyName(e.target.value);
+                  if (companyError) setCompanyError('');
+                }}
               />
 
-              <Input
-                label="Primary Contact Mobile (Used in WhatsApp Templates)"
-                required
-                value={companyMobile}
-                onChange={(e) => setCompanyMobile(e.target.value)}
-              />
+              <div>
+                <Input
+                  label="Primary Contact Mobile (Used in WhatsApp Templates)"
+                  required
+                  type="tel"
+                  value={companyMobile}
+                  onChange={(e) => {
+                    setCompanyMobile(onlyDigits(e.target.value, 10));
+                    if (companyError) setCompanyError('');
+                  }}
+                  className="font-mono"
+                  placeholder="e.g. 9847055667"
+                />
+                <span className="text-[10px] text-slate-400 mt-0.5 block">10 digits, numbers only</span>
+              </div>
             </div>
 
             <div>

@@ -26,55 +26,111 @@ service cloud.firestore {
     // Users collection
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin() || (isAuthenticated() && userId == getUserId());
+      // Admin can create users; users cannot create accounts directly
+      allow create: if isAdmin();
+      // Admin can update any user; non-admin users can ONLY update their own name, mobile, and updatedAt
+      allow update: if isAdmin() || (
+        isAuthenticated() && 
+        request.auth.uid == userId && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'mobile', 'updatedAt'])
+      );
+      // Only Admin can delete users
+      allow delete: if isAdmin();
     }
 
     // Clients collection
     match /clients/{clientId} {
-      allow read: if isAdmin() || (isAgent() && resource.data.assignedAgentId == getUserId());
-      allow create: if isAuthenticated();
-      allow update: if isAdmin() || (isAgent() && resource.data.assignedAgentId == getUserId());
+      // Admin has full read; Agent can read assigned clients or unassigned clients
+      allow read: if isAdmin() || (
+        isAgent() && (
+          resource.data.assignedAgentId == request.auth.uid || 
+          resource.data.assignedAgentId == null
+        )
+      );
+      // Admin can create any client; Agent can create client assigned to themselves
+      allow create: if isAdmin() || (
+        isAgent() && request.resource.data.assignedAgentId == request.auth.uid
+      );
+      // Admin can update any client; Agent can only update their assigned clients
+      allow update: if isAdmin() || (
+        isAgent() && resource.data.assignedAgentId == request.auth.uid
+      );
+      // Only Admin can delete clients
       allow delete: if isAdmin();
     }
 
     // Vehicles collection
     match /vehicles/{vehicleId} {
-      allow read: if isAdmin() || (isAgent() && resource.data.assignedAgentId == getUserId());
-      allow create: if isAuthenticated();
-      allow update: if isAdmin() || (isAgent() && resource.data.assignedAgentId == getUserId());
+      // Admin has full read; Agent can read assigned vehicles or unassigned vehicles
+      allow read: if isAdmin() || (
+        isAgent() && (
+          resource.data.assignedAgentId == request.auth.uid || 
+          resource.data.assignedAgentId == null
+        )
+      );
+      // Admin can create any vehicle; Agent can create vehicle assigned to themselves
+      allow create: if isAdmin() || (
+        isAgent() && request.resource.data.assignedAgentId == request.auth.uid
+      );
+      // Admin can update any vehicle; Agent can only update their assigned vehicles
+      allow update: if isAdmin() || (
+        isAgent() && resource.data.assignedAgentId == request.auth.uid
+      );
+      // Only Admin can delete vehicles
       allow delete: if isAdmin();
     }
 
     // Vehicle Documents collection
     match /vehicleDocuments/{docId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated();
+      allow create, update: if isAdmin() || isAgent();
       allow delete: if isAdmin();
     }
 
     // Tasks collection
     match /tasks/{taskId} {
-      allow read: if isAdmin() || (isAgent() && resource.data.assignedTo == getUserId());
-      allow create: if isAuthenticated();
-      allow update: if isAdmin() || (isAgent() && resource.data.assignedTo == getUserId());
+      // Admin has full read; Agent can read tasks assigned to them
+      allow read: if isAdmin() || (
+        isAgent() && resource.data.assignedTo == request.auth.uid
+      );
+      // Admin can create any task; Agent can create task assigned to themselves
+      allow create: if isAdmin() || (
+        isAgent() && request.resource.data.assignedTo == request.auth.uid
+      );
+      // Admin can update any task; Agent can only update tasks assigned to them
+      allow update: if isAdmin() || (
+        isAgent() && resource.data.assignedTo == request.auth.uid
+      );
+      // Only Admin can delete tasks
       allow delete: if isAdmin();
     }
 
     // Notifications collection
     match /notifications/{notifId} {
-      allow read, update: if isAuthenticated() && resource.data.userId == getUserId();
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.userId == 'all'
+      );
       allow create: if isAuthenticated();
-      allow delete: if isAdmin();
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
     }
 
-    // Activity Logs collection
+    // Activity Logs collection (immutable audit trail with schema validation)
     match /activityLogs/{logId} {
-      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == getUserId());
-      allow create: if isAuthenticated();
-      allow delete: if false; // Audit logs are immutable
+      allow read: if isAdmin();
+      // Validates author attribution and schema: user can only log for themselves with legitimate schema
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.keys().hasAll(['id', 'userId', 'action', 'createdAt']) &&
+        request.resource.data.keys().hasOnly(['id', 'userId', 'userName', 'action', 'details', 'entityType', 'entityId', 'timestamp', 'createdAt']) &&
+        request.resource.data.action is string &&
+        request.resource.data.action.size() <= 200;
+      allow update, delete: if false; // Audit logs cannot be modified or deleted under any circumstances
     }
 
-    // Settings collection
+    // Settings collection (Admin-only modification)
     match /settings/{settingId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();

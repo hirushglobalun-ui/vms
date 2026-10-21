@@ -68,6 +68,15 @@ export interface Vehicle {
   assignedAgentId: string;
   status: VehicleStatus;
   notes?: string;
+  // Point of Contact (POC) details
+  pocName?: string;
+  pocMobile?: string;
+  pocDesignation?: string;
+  // Financial Tracking & Billing Status
+  totalCost?: number;
+  amountReceived?: number;
+  balanceAmount?: number;
+  paymentStatus?: 'SETTLED' | 'BALANCE_DUE' | 'REFUND_DUE';
   // Detailed RC Smart Card Technical Specs
   color?: string;
   bodyType?: string;
@@ -84,6 +93,8 @@ export interface Vehicle {
   createdAt: string;
   updatedAt: string;
 }
+
+export type PaymentStatus = 'SETTLED' | 'BALANCE_DUE' | 'REFUND_DUE';
 
 export type DocumentType = 
   | 'INSURANCE'
@@ -118,6 +129,9 @@ export interface VehicleDocument {
   validityValue?: number;
   validityUnit?: ValidityUnit;
   amount?: number;
+  amountReceived?: number;
+  balanceAmount?: number;
+  paymentStatus?: PaymentStatus;
   reminderDays: number;
   status: RenewalStatus;
   fileUrl?: string;
@@ -160,6 +174,14 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   notes?: string;
+  // POC (Point of Contact) details
+  pocName?: string;
+  pocMobile?: string;
+  // Financial Tracking & Billing Status
+  estimatedCost?: number;
+  amountReceived?: number;
+  balanceAmount?: number;
+  paymentStatus?: PaymentStatus;
   completionNotes?: string;
   completedAt?: string;
   completedBy?: string;

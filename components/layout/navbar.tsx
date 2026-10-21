@@ -49,12 +49,12 @@ export function Navbar({ onMobileMenuToggle }: { onMobileMenuToggle?: () => void
 
   return (
     <>
-      <header className="h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-3 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+      <header className="h-14 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-3 sm:px-5 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
         {/* Left: Mobile Toggle & Quick Search Button */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
           <button
             onClick={onMobileMenuToggle}
-            className="lg:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors"
+            className="lg:hidden p-1.5 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors shrink-0"
             aria-label="Toggle menu"
           >
             <Menu className="w-5 h-5" />
@@ -62,10 +62,11 @@ export function Navbar({ onMobileMenuToggle }: { onMobileMenuToggle?: () => void
 
           <button
             onClick={() => setIsSearchOpen(true)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-all cursor-pointer w-44 sm:w-64 md:w-80"
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-all cursor-pointer w-28 xs:w-36 sm:w-64 md:w-80 min-w-0"
           >
-            <Search className="w-4 h-4 text-slate-400 shrink-0" />
-            <span className="flex-1 text-left truncate">Search vehicle (KL-10...), client...</span>
+            <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span className="flex-1 text-left truncate hidden sm:inline">Search vehicle (KL-10...), client...</span>
+            <span className="flex-1 text-left truncate sm:hidden">Search...</span>
             <kbd className="hidden md:inline-block font-mono bg-white border border-slate-200 px-1.5 py-0.5 rounded text-[10px] text-slate-400">
               Ctrl+K
             </kbd>

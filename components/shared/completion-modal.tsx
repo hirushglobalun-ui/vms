@@ -1,13 +1,29 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
-import { Input, Select } from '@/components/ui/input';
 import { useApp } from '@/lib/store/app-context';
-import { VehicleDocument } from '@/lib/types';
-import { CheckCircle2, Calendar, FileText, ArrowRight } from 'lucide-react';
+import { DocumentType, VehicleDocument } from '@/lib/types';
+import {
+  CheckCircle2,
+  FileText,
+  ArrowRight,
+  UploadCloud,
+  X,
+  Calendar,
+  Sparkles,
+  ShieldCheck,
+  RotateCw,
+  FileCheck2,
+  Clock,
+  Layers,
+  Receipt,
+  IndianRupee,
+  AlertCircle,
+} from 'lucide-react';
 import { calculateNextDueDate, getDocumentTypeName } from '@/lib/renewals/engine';
+import { calculatePaymentBalance } from '@/lib/utils';
 
 interface CompletionModalProps {
   isOpen: boolean;
@@ -17,6 +33,53 @@ interface CompletionModalProps {
   registrationNumber: string;
 }
 
+// Helpers for document category badges & presets
+function getDocTheme(docType: DocumentType) {
+  switch (docType) {
+    case 'PUC':
+      return {
+        badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        ring: 'ring-emerald-500/20',
+        accent: 'text-emerald-600',
+        defaultQuick: 6,
+        quickUnit: 'MONTHS' as const,
+      };
+    case 'INSURANCE':
+      return {
+        badge: 'bg-purple-50 text-purple-700 border-purple-200',
+        ring: 'ring-purple-500/20',
+        accent: 'text-purple-600',
+        defaultQuick: 1,
+        quickUnit: 'YEARS' as const,
+      };
+    case 'FITNESS':
+      return {
+        badge: 'bg-amber-50 text-amber-700 border-amber-200',
+        ring: 'ring-amber-500/20',
+        accent: 'text-amber-600',
+        defaultQuick: 1,
+        quickUnit: 'YEARS' as const,
+      };
+    case 'ROAD_TAX':
+    case 'GREEN_TAX':
+      return {
+        badge: 'bg-blue-50 text-blue-700 border-blue-200',
+        ring: 'ring-blue-500/20',
+        accent: 'text-blue-600',
+        defaultQuick: 1,
+        quickUnit: 'YEARS' as const,
+      };
+    default:
+      return {
+        badge: 'bg-slate-50 text-slate-700 border-slate-200',
+        ring: 'ring-slate-500/20',
+        accent: 'text-slate-600',
+        defaultQuick: 1,
+        quickUnit: 'YEARS' as const,
+      };
+  }
+}
+
 export function CompletionModal({
   isOpen,
   onClose,
@@ -24,193 +87,515 @@ export function CompletionModal({
   linkedTaskId,
   registrationNumber,
 }: CompletionModalProps) {
-  const { completeRenewalCycle } = useApp();
+  const { completeRenewalCycle, vehicles, tasks } = useApp();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [newDocumentNumber, setNewDocumentNumber] = useState(doc.documentNumber || '');
-  const [newIssueDate, setNewIssueDate] = useState(new Date().toISOString().split('T')[0]);
+  const linkedTask = linkedTaskId ? tasks.find((t) => t.id === linkedTaskId) : undefined;
+  const linkedVehicle = doc.vehicleId ? vehicles.find((v) => v.id === doc.vehicleId) : undefined;
+
   const [newExpiryDate, setNewExpiryDate] = useState('');
-  const [newAmount, setNewAmount] = useState(doc.amount ? String(doc.amount) : '');
-  const [notes, setNotes] = useState('');
+  const [selectedQuickPreset, setSelectedQuickPreset] = useState<string | null>(null);
+
+  // Financial & Billing Tracking
+  const [finalAmount, setFinalAmount] = useState<string>('');
+  const [amountReceived, setAmountReceived] = useState<string>('');
+  const [markSettledNow, setMarkSettledNow] = useState<boolean>(false);
+
   const [fileName, setFileName] = useState('');
+  const [fileUrl, setFileUrl] = useState('');
+  const [fileSize, setFileSize] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [completionError, setCompletionError] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
 
-  // Quick preset helper
-  const handleQuickValidity = (years: number) => {
-    const computed = calculateNextDueDate(newIssueDate, years, 'YEARS');
+  const theme = getDocTheme(doc.documentType);
+  const baseDate = doc.expiryDate || new Date().toISOString().split('T')[0];
+
+  useEffect(() => {
+    if (isOpen) {
+      const adv = linkedTask?.amountReceived ?? doc.amountReceived ?? linkedVehicle?.amountReceived;
+      const cost = doc.amount ?? linkedTask?.estimatedCost ?? linkedVehicle?.totalCost;
+      setFinalAmount(cost !== undefined && cost !== null ? String(cost) : '');
+      setAmountReceived(adv !== undefined && adv !== null ? String(adv) : '');
+      setMarkSettledNow(false);
+      setCompletionError('');
+    }
+  }, [isOpen, doc.id, linkedTaskId, linkedTask, linkedVehicle, doc.amountReceived, doc.amount]);
+
+  const handleQuickValidity = (years: number, label: string) => {
+    const computed = calculateNextDueDate(baseDate, years, 'YEARS');
     setNewExpiryDate(computed);
+    setSelectedQuickPreset(label);
+    if (completionError) setCompletionError('');
   };
 
-  const handleQuickMonths = (months: number) => {
-    const computed = calculateNextDueDate(newIssueDate, months, 'MONTHS');
+  const handleQuickMonths = (months: number, label: string) => {
+    const computed = calculateNextDueDate(baseDate, months, 'MONTHS');
     setNewExpiryDate(computed);
+    setSelectedQuickPreset(label);
+    if (completionError) setCompletionError('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleProcessFile = (file: File) => {
+    setFileName(file.name);
+    const sizeKb = Math.round(file.size / 1024);
+    setFileSize(sizeKb > 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${sizeKb} KB`);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setFileUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleProcessFile(e.target.files[0]);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleProcessFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setFileName('');
+    setFileUrl('');
+    setFileSize('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const parsedFinal = finalAmount.trim() ? Number(finalAmount) : 0;
+  const parsedReceived = markSettledNow
+    ? parsedFinal
+    : (amountReceived.trim() ? Number(amountReceived) : 0);
+  const billingSummary = (finalAmount.trim() || amountReceived.trim())
+    ? calculatePaymentBalance(parsedFinal, parsedReceived)
+    : null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCompletionError('');
+
     if (!newExpiryDate) {
-      alert('Please enter or select the new expiry/due date for the next cycle.');
+      setCompletionError('Please select or specify the new validity expiry date.');
       return;
     }
 
     setIsSubmitting(true);
-    completeRenewalCycle(
-      doc.id,
-      {
-        newDocumentNumber: newDocumentNumber || undefined,
-        newIssueDate,
-        newExpiryDate,
-        newAmount: newAmount ? Number(newAmount) : undefined,
-        notes: notes || undefined,
-        fileName: fileName || undefined,
-        fileUrl: fileName ? `/uploads/${fileName}` : undefined,
-      },
-      linkedTaskId
-    );
-
-    setIsSubmitting(false);
-    onClose();
+    try {
+      await completeRenewalCycle(
+        doc.id,
+        {
+          newExpiryDate,
+          newIssueDate: new Date().toISOString().split('T')[0],
+          newAmount: finalAmount.trim() ? parsedFinal : undefined,
+          amountReceived: (amountReceived.trim() || markSettledNow) ? parsedReceived : undefined,
+          balanceAmount: billingSummary ? billingSummary.balanceAmount : undefined,
+          paymentStatus: billingSummary ? billingSummary.paymentStatus : undefined,
+          fileName: fileName || undefined,
+          fileUrl: fileUrl || undefined,
+        },
+        linkedTaskId
+      );
+      onClose();
+    } catch (err: any) {
+      setCompletionError(err?.message || 'Failed to complete renewal.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Complete Renewal Cycle"
-      description={`Record completed renewal for ${registrationNumber} and set up the next tracking cycle.`}
+      title=""
       maxWidth="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Current status banner */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-center justify-between text-xs">
-          <div>
-            <span className="font-semibold text-slate-800">
-              {getDocumentTypeName(doc.documentType)}:
-            </span>{' '}
-            <span className="text-slate-600">Old Expiry: {doc.expiryDate || 'N/A'}</span>
+      <form onSubmit={handleSubmit} className="space-y-3.5">
+        {/* Modern Header */}
+        <div className="flex items-start gap-3.5 pb-3.5 border-b border-slate-100">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+            <CheckCircle2 className="w-5 h-5" />
           </div>
-          <div className="flex items-center gap-1.5 text-blue-700 font-semibold bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200">
-            <ArrowRight className="w-3.5 h-3.5" />
-            Archive to History & Start Next Cycle
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                {registrationNumber}
+              </span>
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${theme.badge}`}>
+                {getDocumentTypeName(doc.documentType)}
+              </span>
+            </div>
+            <h2 className="text-base font-bold text-slate-900 leading-tight">
+              Complete Renewal Cycle
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Record new validity milestone and archive current certificate.
+            </p>
           </div>
         </div>
 
-        {/* Inputs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input
-            label="New Document / Policy Number"
-            value={newDocumentNumber}
-            onChange={(e) => setNewDocumentNumber(e.target.value)}
-            placeholder="e.g. POL-2026-9901 or PUC-778"
-          />
+        {/* Error Alert */}
+        {completionError && (
+          <div className="p-3 bg-rose-50 border border-rose-200/90 rounded-xl text-xs text-rose-700 font-semibold flex items-center gap-2 animate-in fade-in">
+            <span className="w-2 h-2 rounded-full bg-rose-600 shrink-0 animate-ping" />
+            <span>{completionError}</span>
+          </div>
+        )}
 
-          <Input
-            label="Payment / Premium Amount (₹)"
-            type="number"
-            value={newAmount}
-            onChange={(e) => setNewAmount(e.target.value)}
-            placeholder="e.g. 15000"
-          />
+        {/* Sleek Cycle Timeline Flow */}
+        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/70 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-white text-slate-500 flex items-center justify-center border border-slate-200 shrink-0">
+              <Clock className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Previous Expiry</div>
+              <div className="font-mono font-bold text-slate-700 text-xs">{doc.expiryDate || 'N/A'}</div>
+            </div>
+          </div>
 
-          <Input
-            label="Issue / Payment Date"
+          <div className="flex items-center gap-1.5 px-3 text-slate-300">
+            <div className="w-6 h-0.5 bg-slate-200" />
+            <ArrowRight className="w-4 h-4 text-blue-500" />
+            <div className="w-6 h-0.5 bg-slate-200" />
+          </div>
+
+          <div className="flex items-center gap-2 text-right">
+            <div>
+              <div className="text-[10px] uppercase font-bold text-blue-600 tracking-wider">New Expiry</div>
+              <div className="font-mono font-bold text-blue-700 text-xs">
+                {newExpiryDate ? (
+                  <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                    {newExpiryDate}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 italic font-normal">Select below</span>
+                )}
+              </div>
+            </div>
+            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200 shrink-0">
+              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Expiry Date & Quick Intervals */}
+        <div className="space-y-2">
+          <label className="block text-xs font-bold text-slate-800 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-blue-600" />
+              New Validity Expiry Date <span className="text-rose-500">*</span>
+            </span>
+            <span className="text-[11px] font-normal text-slate-400">DD / MM / YYYY</span>
+          </label>
+
+          <input
             type="date"
             required
-            value={newIssueDate}
-            onChange={(e) => setNewIssueDate(e.target.value)}
+            value={newExpiryDate}
+            onChange={(e) => {
+              setNewExpiryDate(e.target.value);
+              setSelectedQuickPreset(null);
+              if (completionError) setCompletionError('');
+            }}
+            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-900 font-mono font-bold text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/30 focus:border-blue-600 transition-all cursor-pointer shadow-2xs"
           />
 
-          <div>
-            <Input
-              label="Next Expiry / Due Date"
-              type="date"
-              required
-              value={newExpiryDate}
-              onChange={(e) => setNewExpiryDate(e.target.value)}
-            />
-            {/* Quick calculation buttons */}
-            <div className="flex gap-1.5 mt-1.5 flex-wrap">
+          {/* Quick Preset Segmented Pills */}
+          <div className="pt-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 flex items-center gap-1">
+                <RotateCw className="w-2.5 h-2.5" /> Presets:
+              </span>
+
+              {doc.documentType === 'PUC' && (
+                <button
+                  type="button"
+                  onClick={() => handleQuickMonths(6, '+6 Months (PUC)')}
+                  className={`text-xs px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                    selectedQuickPreset === '+6 Months (PUC)'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                  }`}
+                >
+                  +6 Mo (PUC)
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={() => handleQuickMonths(6)}
-                className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded cursor-pointer"
+                onClick={() => handleQuickValidity(1, '+1 Year')}
+                className={`text-xs px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                  selectedQuickPreset === '+1 Year'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                }`}
               >
-                +6 Months (PUC)
+                +1 Year
               </button>
+
               <button
                 type="button"
-                onClick={() => handleQuickValidity(1)}
-                className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded cursor-pointer"
+                onClick={() => handleQuickValidity(2, '+2 Years')}
+                className={`text-xs px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                  selectedQuickPreset === '+2 Years'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                }`}
               >
-                +1 Year (Ins/Fitness)
+                +2 Years
               </button>
+
               <button
                 type="button"
-                onClick={() => handleQuickValidity(5)}
-                className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded cursor-pointer"
+                onClick={() => handleQuickValidity(3, '+3 Years')}
+                className={`text-xs px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                  selectedQuickPreset === '+3 Years'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                }`}
               >
-                +5 Years (Tax/Permit)
+                +3 Years
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickValidity(5, '+5 Years')}
+                className={`text-xs px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                  selectedQuickPreset === '+5 Years'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                }`}
+              >
+                +5 Years
               </button>
             </div>
           </div>
         </div>
 
-        {/* Upload attachment */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-            Attach New Document File (PDF / JPG / PNG)
-          </label>
-          <div className="border border-dashed border-slate-300 rounded-lg p-3 text-center hover:bg-slate-50 transition-colors">
-            <input
-              type="file"
-              id="renewalDocFile"
-              className="hidden"
-              accept=".pdf,.png,.jpg,.jpeg"
-              onChange={(e) => {
-                if (e.target.files && e.target.files[0]) {
-                  setFileName(e.target.files[0].name);
-                }
-              }}
-            />
-            <label
-              htmlFor="renewalDocFile"
-              className="cursor-pointer text-xs flex flex-col items-center justify-center text-slate-600 gap-1"
-            >
-              <FileText className="w-5 h-5 text-blue-600" />
-              <span className="font-semibold text-blue-600">
-                {fileName ? fileName : 'Click to select renewed document file'}
-              </span>
-              <span className="text-[11px] text-slate-400">PDF, JPG, or PNG up to 15MB</span>
-            </label>
+        {/* Final Settlement & Billing Comparison */}
+        <div className="p-3.5 rounded-xl bg-slate-50/90 border border-slate-200/90 space-y-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-slate-900 flex items-center gap-1.5">
+              <Receipt className="w-3.5 h-3.5 text-blue-600" />
+              Settlement &amp; Billing (തുക താരതമ്യം ചെയ്യൽ)
+            </span>
+            <span className="text-[11px] text-slate-500 font-medium">Final Cost vs Advance</span>
           </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                Final Total Amount (₹) <span className="text-slate-400 font-normal">(യഥാർത്ഥ തുക)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-slate-400 text-xs font-semibold">₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 1500"
+                  value={finalAmount}
+                  onChange={(e) => setFinalAmount(e.target.value)}
+                  className="w-full pl-7 pr-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 font-mono font-bold bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/30 focus:border-blue-600 shadow-2xs"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                Advance Paid by Client (₹) <span className="text-slate-400 font-normal">(മുൻപ് നൽകിയത്)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-slate-400 text-xs font-semibold">₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 500"
+                  disabled={markSettledNow}
+                  value={markSettledNow ? (finalAmount || '0') : amountReceived}
+                  onChange={(e) => setAmountReceived(e.target.value)}
+                  className="w-full pl-7 pr-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 font-mono font-bold bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/30 focus:border-blue-600 disabled:bg-slate-100 disabled:text-slate-500 shadow-2xs"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Settle Now Toggle Checkbox */}
+          {billingSummary && billingSummary.paymentStatus === 'BALANCE_DUE' && (
+            <label className="flex items-center gap-2 cursor-pointer pt-0.5 select-none text-xs text-slate-700 font-medium">
+              <input
+                type="checkbox"
+                checked={markSettledNow}
+                onChange={(e) => setMarkSettledNow(e.target.checked)}
+                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+              />
+              <span>
+                Mark remaining <strong className="font-mono text-slate-900">₹{billingSummary.balanceAmount.toLocaleString('en-IN')}</strong> as received now (പൂർണ്ണമായി വാങ്ങി സെറ്റിൽഡ് ആക്കുക)
+              </span>
+            </label>
+          )}
+
+          {/* Dynamic Comparison Banner */}
+          {billingSummary && (finalAmount.trim() || amountReceived.trim() || markSettledNow) && (
+            <div
+              className={`p-2.5 rounded-xl border text-xs flex items-center justify-between transition-all shadow-2xs ${
+                markSettledNow || billingSummary.paymentStatus === 'SETTLED'
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                  : billingSummary.paymentStatus === 'REFUND_DUE'
+                  ? 'bg-blue-50 text-blue-900 border-blue-300'
+                  : 'bg-amber-50 text-amber-950 border-amber-300'
+              }`}
+            >
+              <div className="flex items-center gap-2 font-bold">
+                {markSettledNow || billingSummary.paymentStatus === 'SETTLED' ? (
+                  <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  </div>
+                ) : (
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-white ${
+                    billingSummary.paymentStatus === 'REFUND_DUE' ? 'bg-blue-600' : 'bg-amber-600'
+                  }`}>
+                    <AlertCircle className="w-3.5 h-3.5" />
+                  </div>
+                )}
+                <div>
+                  {markSettledNow ? (
+                    <span>
+                      Payment Settled in Full: <strong className="font-mono">₹{parsedFinal.toLocaleString('en-IN')}</strong> (തുക പൂർണ്ണമായി ഒത്തുതീർപ്പായി)
+                    </span>
+                  ) : billingSummary.paymentStatus === 'BALANCE_DUE' ? (
+                    <span>
+                      ⚠️ Balance Due: Collect <strong className="font-mono text-rose-700 text-sm">₹{billingSummary.balanceAmount.toLocaleString('en-IN')}</strong> from client (ബാക്കി തുക വാങ്ങുക)
+                    </span>
+                  ) : billingSummary.paymentStatus === 'REFUND_DUE' ? (
+                    <span>
+                      🔄 Refund Due: Return <strong className="font-mono text-blue-700 text-sm">₹{billingSummary.balanceAmount.toLocaleString('en-IN')}</strong> to client (അധിക തുക തിരിച്ചു നൽകുക)
+                    </span>
+                  ) : (
+                    <span>
+                      ✅ All Settled: <strong className="font-mono">₹{billingSummary.totalCost.toLocaleString('en-IN')}</strong> (ബാക്കി ഒന്നുമില്ല)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider bg-white/70 border border-slate-200/50 shrink-0">
+                {markSettledNow ? 'SETTLED' : billingSummary.paymentStatus.replace('_', ' ')}
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Notes */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-            Completion Notes & Follow-up Summary
+        {/* Compact File Uploader */}
+        <div className="space-y-1.5 pt-1">
+          <label className="block text-xs font-bold text-slate-800 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <FileCheck2 className="w-3.5 h-3.5 text-blue-600" />
+              Attach Digital Copy (Optional)
+            </span>
+            <span className="text-[11px] font-normal text-slate-400">PDF, JPG, PNG (Max 15MB)</span>
           </label>
-          <textarea
-            rows={3}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g. Paid online via Parivahan portal. Certificate received and WhatsApp copy forwarded to client."
-            className="w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600"
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            id="renewalDocUpload"
+            className="hidden"
+            accept=".pdf,.png,.jpg,.jpeg,.webp"
+            onChange={handleFileChange}
           />
+
+          {fileName ? (
+            <div className="p-3 bg-emerald-50/90 border border-emerald-200 rounded-xl flex items-center justify-between text-xs shadow-2xs">
+              <div className="flex items-center gap-2.5 overflow-hidden">
+                <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div className="overflow-hidden">
+                  <div className="font-bold text-slate-900 truncate max-w-[220px] sm:max-w-xs text-xs">
+                    {fileName}
+                  </div>
+                  <div className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    <span>Attached {fileSize && `• ${fileSize}`}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <label
+                  htmlFor="renewalDocUpload"
+                  className="px-2 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors"
+                >
+                  Change
+                </label>
+                <button
+                  type="button"
+                  onClick={handleRemoveFile}
+                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                  title="Remove file"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <label
+              htmlFor="renewalDocUpload"
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+              className={`border border-dashed rounded-xl py-3 px-4 text-center transition-all cursor-pointer flex items-center justify-center gap-2.5 group ${
+                isDragging
+                  ? 'border-blue-500 bg-blue-50/70 ring-2 ring-blue-500/20'
+                  : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50/30 bg-slate-50/50'
+              }`}
+            >
+              <div className="w-7 h-7 rounded-full bg-blue-50 group-hover:bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 transition-colors">
+                <UploadCloud className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <span className="text-xs font-semibold text-slate-700 group-hover:text-blue-600 transition-colors">
+                  Upload renewed certificate scan
+                </span>
+                <span className="text-[10px] text-slate-400 block">
+                  Click to browse or drag &amp; drop file here
+                </span>
+              </div>
+            </label>
+          )}
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-          <Button type="button" variant="secondary" onClick={onClose}>
+        {/* Modal Actions */}
+        <div className="flex items-center justify-end gap-2.5 pt-3.5 border-t border-slate-100">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="rounded-xl px-4 text-xs font-semibold cursor-pointer"
+          >
             Cancel
           </Button>
           <Button
             type="submit"
-            variant="success"
+            variant="primary"
             isLoading={isSubmitting}
-            className="gap-2"
+            className="rounded-xl px-5 text-xs font-bold gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm cursor-pointer"
           >
             <CheckCircle2 className="w-4 h-4" />
-            Complete & Track Next Cycle
+            <span>Confirm &amp; Roll Over</span>
           </Button>
         </div>
       </form>

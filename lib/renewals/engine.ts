@@ -166,3 +166,50 @@ export function getDefaultReminderDays(type: DocumentType): number {
       return 30;
   }
 }
+
+/**
+ * Standard business-rule validity period per document type and vehicle classification.
+ * Configurable with explicit overrides while adhering to regional transport rules.
+ */
+export function getDefaultValidity(
+  type: DocumentType,
+  vehicleType?: string
+): { value: number; unit: ValidityUnit } {
+  switch (type) {
+    case 'INSURANCE':
+      return { value: 1, unit: 'YEARS' };
+    case 'PUC':
+      return { value: 6, unit: 'MONTHS' };
+    case 'FITNESS': {
+      const isCommercial =
+        vehicleType &&
+        ['COMMERCIAL_TAXI', 'GOODS_CARRIER', 'BUS', 'AUTO_RICKSHAW'].includes(vehicleType);
+      return { value: isCommercial ? 1 : 5, unit: 'YEARS' };
+    }
+    case 'PERMIT':
+      return { value: 5, unit: 'YEARS' };
+    case 'GREEN_TAX':
+      return { value: 5, unit: 'YEARS' };
+    case 'ROAD_TAX':
+      return { value: 1, unit: 'YEARS' };
+    case 'RC':
+      return { value: 15, unit: 'YEARS' };
+    default:
+      return { value: 1, unit: 'YEARS' };
+  }
+}
+
+/**
+ * Calculates next document expiry using validated business rules from existing expiry or base date,
+ * preserving existing calendar date where appropriate.
+ */
+export function calculateBusinessNextDueDate(
+  baseExpiryDateStr: string,
+  docType: DocumentType,
+  vehicleType?: string,
+  customValidity?: { value: number; unit: ValidityUnit }
+): string {
+  if (!baseExpiryDateStr) return '';
+  const validity = customValidity || getDefaultValidity(docType, vehicleType);
+  return calculateNextDueDate(baseExpiryDateStr, validity.value, validity.unit);
+}

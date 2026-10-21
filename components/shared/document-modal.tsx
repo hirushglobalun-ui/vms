@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { useApp } from '@/lib/store/app-context';
-import { DocumentType, ValidityUnit, VehicleDocument } from '@/lib/types';
-import { calculateNextDueDate, getDefaultReminderDays, getDocumentTypeName } from '@/lib/renewals/engine';
-import { FileUp, Calendar, AlertCircle } from 'lucide-react';
+import { DocumentType, VehicleDocument } from '@/lib/types';
+import { getDefaultReminderDays, getDocumentTypeName } from '@/lib/renewals/engine';
+import { FileUp, FileText, CheckCircle2, X } from 'lucide-react';
+import { validateName } from '@/lib/validation';
 
 interface DocumentModalProps {
   isOpen: boolean;
@@ -24,68 +25,41 @@ export function DocumentModal({
   clientId,
   initialDocument,
 }: DocumentModalProps) {
-  const { addDocument, updateDocument, settings } = useApp();
+  const { addDocument, updateDocument } = useApp();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [documentType, setDocumentType] = useState<DocumentType>('INSURANCE');
   const [documentName, setDocumentName] = useState('');
-  const [documentNumber, setDocumentNumber] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [issueDate, setIssueDate] = useState('');
-  const [lastPaymentDate, setLastPaymentDate] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
-  const [validityValue, setValidityValue] = useState<number | ''>('');
-  const [validityUnit, setValidityUnit] = useState<ValidityUnit>('YEARS');
-  const [amount, setAmount] = useState<number | ''>('');
   const [reminderDays, setReminderDays] = useState<number>(30);
-  const [insuranceProvider, setInsuranceProvider] = useState('');
-  const [policyType, setPolicyType] = useState<'COMPREHENSIVE' | 'THIRD_PARTY' | 'BUMPER_TO_BUMPER' | 'OTHER'>('COMPREHENSIVE');
-  const [testingCentre, setTestingCentre] = useState('');
-  const [fitnessType, setFitnessType] = useState('');
-  const [permitType, setPermitType] = useState('');
-  const [notes, setNotes] = useState('');
+  const [docError, setDocError] = useState('');
+  
+  // Real File Upload State
   const [fileName, setFileName] = useState('');
+  const [fileUrl, setFileUrl] = useState('');
+  const [fileSize, setFileSize] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    setDocError('');
     if (initialDocument) {
       setDocumentType(initialDocument.documentType);
       setDocumentName(initialDocument.documentName || '');
-      setDocumentNumber(initialDocument.documentNumber || '');
-      setStartDate(initialDocument.startDate || '');
-      setIssueDate(initialDocument.issueDate || '');
-      setLastPaymentDate(initialDocument.lastPaymentDate || '');
       setExpiryDate(initialDocument.expiryDate || '');
-      setValidityValue(initialDocument.validityValue ?? '');
-      setValidityUnit(initialDocument.validityUnit || 'YEARS');
-      setAmount(initialDocument.amount ?? '');
       setReminderDays(initialDocument.reminderDays ?? 30);
-      setInsuranceProvider(initialDocument.insuranceProvider || '');
-      setPolicyType(initialDocument.policyType || 'COMPREHENSIVE');
-      setTestingCentre(initialDocument.testingCentre || '');
-      setFitnessType(initialDocument.fitnessType || '');
-      setPermitType(initialDocument.permitType || '');
-      setNotes(initialDocument.notes || '');
       setFileName(initialDocument.fileName || '');
+      setFileUrl(initialDocument.fileUrl || '');
+      setFileSize(initialDocument.fileUrl ? 'Attached' : '');
     } else {
-      // Defaults for new doc
       setDocumentType('INSURANCE');
       setDocumentName('');
-      setDocumentNumber('');
-      setStartDate(new Date().toISOString().split('T')[0]);
-      setIssueDate(new Date().toISOString().split('T')[0]);
-      setLastPaymentDate('');
       setExpiryDate('');
-      setValidityValue('');
-      setValidityUnit('YEARS');
-      setAmount('');
       setReminderDays(getDefaultReminderDays('INSURANCE'));
-      setInsuranceProvider('');
-      setPolicyType('COMPREHENSIVE');
-      setTestingCentre('');
-      setFitnessType('');
-      setPermitType('');
-      setNotes('');
       setFileName('');
+      setFileUrl('');
+      setFileSize('');
     }
+    setIsSaving(false);
   }, [initialDocument, isOpen]);
 
   const handleDocumentTypeChange = (newType: DocumentType) => {
@@ -93,48 +67,85 @@ export function DocumentModal({
     setReminderDays(getDefaultReminderDays(newType));
   };
 
-  const handleCalculateFromValidity = () => {
-    const base = lastPaymentDate || issueDate || startDate;
-    if (base && validityValue) {
-      const calculated = calculateNextDueDate(base, Number(validityValue), validityUnit);
-      setExpiryDate(calculated);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setFileName(file.name);
+
+      const sizeKb = Math.round(file.size / 1024);
+      setFileSize(sizeKb > 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${sizeKb} KB`);
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setFileUrl(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleRemoveFile = () => {
+    setFileName('');
+    setFileUrl('');
+    setFileSize('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setDocError('');
 
-    const docPayload = {
-      vehicleId,
-      clientId,
-      documentType,
-      documentName: documentType === 'OTHER' ? documentName : undefined,
-      documentNumber: documentNumber || undefined,
-      startDate: startDate || undefined,
-      issueDate: issueDate || undefined,
-      lastPaymentDate: lastPaymentDate || undefined,
-      expiryDate: expiryDate || undefined,
-      validityValue: validityValue ? Number(validityValue) : undefined,
-      validityUnit: validityValue ? validityUnit : undefined,
-      amount: amount ? Number(amount) : undefined,
-      reminderDays: Number(reminderDays) || 30,
-      notes: notes || undefined,
-      fileName: fileName || undefined,
-      fileUrl: fileName ? `/uploads/${fileName}` : undefined,
-      insuranceProvider: documentType === 'INSURANCE' ? insuranceProvider : undefined,
-      policyType: documentType === 'INSURANCE' ? policyType : undefined,
-      testingCentre: documentType === 'PUC' ? testingCentre : undefined,
-      fitnessType: documentType === 'FITNESS' ? fitnessType : undefined,
-      permitType: documentType === 'PERMIT' ? permitType : undefined,
-    };
-
-    if (initialDocument) {
-      updateDocument(initialDocument.id, docPayload);
-    } else {
-      addDocument(docPayload);
+    if (documentType === 'OTHER') {
+      const nameVal = validateName(documentName, 'Document name / title');
+      if (!nameVal.isValid) {
+        setDocError(nameVal.error || 'Please enter a valid document name.');
+        return;
+      }
     }
 
-    onClose();
+    if (documentType !== 'RC' && !expiryDate) {
+      setDocError('Please select a valid expiry / compliance due date.');
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const docPayload = {
+        vehicleId,
+        clientId,
+        documentType,
+        documentName: documentType === 'OTHER' ? documentName : undefined,
+        documentNumber: initialDocument?.documentNumber || undefined,
+        startDate: initialDocument?.startDate || undefined,
+        issueDate: initialDocument?.issueDate || undefined,
+        lastPaymentDate: initialDocument?.lastPaymentDate || undefined,
+        expiryDate: expiryDate || undefined,
+        reminderDays: Number(reminderDays) || 30,
+        notes: initialDocument?.notes || undefined,
+        fileName: fileName || undefined,
+        fileUrl: fileUrl || (fileName ? `/uploads/${fileName}` : undefined),
+        insuranceProvider: initialDocument?.insuranceProvider || undefined,
+        policyType: initialDocument?.policyType || undefined,
+        testingCentre: initialDocument?.testingCentre || undefined,
+        fitnessType: initialDocument?.fitnessType || undefined,
+        permitType: initialDocument?.permitType || undefined,
+      };
+
+      if (initialDocument) {
+        await updateDocument(initialDocument.id, docPayload);
+      } else {
+        await addDocument(docPayload);
+      }
+      onClose();
+    } catch (err) {
+      console.error('Save document error:', err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -142,227 +153,137 @@ export function DocumentModal({
       isOpen={isOpen}
       onClose={onClose}
       title={initialDocument ? `Edit ${getDocumentTypeName(documentType)}` : 'Add Vehicle Document'}
-      description="Record registration, tax, insurance, or compliance details."
-      maxWidth="xl"
+      description="Update compliance expiry date and attach digital copy scan."
+      maxWidth="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Select
-            label="Document Category"
-            value={documentType}
-            onChange={(e) => handleDocumentTypeChange(e.target.value as DocumentType)}
-            disabled={Boolean(initialDocument)}
-          >
-            <option value="INSURANCE">Insurance Policy</option>
-            <option value="ROAD_TAX">Road Tax (MVD)</option>
-            <option value="GREEN_TAX">Green Tax</option>
-            <option value="PUC">Pollution / PUC Certificate</option>
-            <option value="FITNESS">Fitness Certificate (FC)</option>
-            <option value="PERMIT">Vehicle Permit</option>
-            <option value="RC">RC / Registration Card</option>
-            <option value="OTHER">Other Custom Document</option>
-          </Select>
+        {docError && (
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold flex items-center gap-2 animate-in fade-in">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0" />
+            {docError}
+          </div>
+        )}
 
-          {documentType === 'OTHER' ? (
-            <Input
-              label="Document Name / Title"
-              required
-              value={documentName}
-              onChange={(e) => setDocumentName(e.target.value)}
-              placeholder="e.g. Hazardous Goods Endorsement"
-            />
-          ) : (
-            <Input
-              label="Document / Policy / Certificate Number"
-              value={documentNumber}
-              onChange={(e) => setDocumentNumber(e.target.value)}
-              placeholder="e.g. POL-992384 or PUC-102"
-            />
-          )}
-        </div>
-
-        {/* Type-Specific Fields */}
-        {documentType === 'INSURANCE' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-blue-50/50 rounded-xl border border-blue-100">
-            <Input
-              label="Insurance Provider / Company"
-              value={insuranceProvider}
-              onChange={(e) => setInsuranceProvider(e.target.value)}
-              placeholder="e.g. Oriental, New India, Digit, ICICI Lombard"
-            />
+        {/* Only when creating new document, select category */}
+        {!initialDocument && (
+          <div className="space-y-3">
             <Select
-              label="Policy Coverage Type"
-              value={policyType}
-              onChange={(e) => setPolicyType(e.target.value as any)}
+              label="Document Category"
+              value={documentType}
+              onChange={(e) => handleDocumentTypeChange(e.target.value as DocumentType)}
             >
-              <option value="COMPREHENSIVE">Comprehensive (Package)</option>
-              <option value="THIRD_PARTY">Third Party (TP Only)</option>
-              <option value="BUMPER_TO_BUMPER">Bumper to Bumper (Zero Dep)</option>
-              <option value="OTHER">Other Add-on</option>
+              <option value="INSURANCE">Insurance Policy</option>
+              <option value="ROAD_TAX">Road Tax (MVD)</option>
+              <option value="GREEN_TAX">Green Tax</option>
+              <option value="PUC">Pollution / PUC Certificate</option>
+              <option value="FITNESS">Fitness Certificate (FC)</option>
+              <option value="PERMIT">Vehicle Permit</option>
+              <option value="RC">RC / Registration Card</option>
+              <option value="OTHER">Other Custom Document</option>
             </Select>
+
+            {documentType === 'OTHER' && (
+              <Input
+                label="Document Name / Title"
+                required
+                value={documentName}
+                onChange={(e) => setDocumentName(e.target.value)}
+                placeholder="e.g. Endorsement Certificate"
+              />
+            )}
           </div>
         )}
 
-        {documentType === 'PUC' && (
-          <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-100">
-            <Input
-              label="Authorized Testing Centre / Station"
-              value={testingCentre}
-              onChange={(e) => setTestingCentre(e.target.value)}
-              placeholder="e.g. Malabar Green Fuel Smoke Testing Center, Perinthalmanna"
-            />
-          </div>
-        )}
-
-        {documentType === 'FITNESS' && (
-          <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-100">
-            <Input
-              label="Fitness Category / Class"
-              value={fitnessType}
-              onChange={(e) => setFitnessType(e.target.value)}
-              placeholder="e.g. Commercial Light Passenger Vehicle (Taxi)"
-            />
-          </div>
-        )}
-
-        {documentType === 'PERMIT' && (
-          <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
-            <Input
-              label="Permit Classification"
-              value={permitType}
-              onChange={(e) => setPermitType(e.target.value)}
-              placeholder="e.g. All Kerala Taxi, National Goods Permit"
-            />
-          </div>
-        )}
-
-        {/* Validity & Dates Section */}
-        <div className="space-y-3 pt-2 border-t border-slate-100">
-          <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Validity, Due Dates & Reminder Threshold
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Input
-              label="Issue / Start Date"
-              type="date"
-              value={issueDate || startDate || lastPaymentDate}
-              onChange={(e) => {
-                setIssueDate(e.target.value);
-                setStartDate(e.target.value);
-                setLastPaymentDate(e.target.value);
-              }}
-            />
-
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Validity Period Calculation (Optional)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  placeholder="e.g. 5"
-                  value={validityValue}
-                  onChange={(e) => setValidityValue(e.target.value ? Number(e.target.value) : '')}
-                  className="w-24 rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
-                />
-                <select
-                  value={validityUnit}
-                  onChange={(e) => setValidityUnit(e.target.value as ValidityUnit)}
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
-                >
-                  <option value="YEARS">Years</option>
-                  <option value="MONTHS">Months</option>
-                  <option value="DAYS">Days</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={handleCalculateFromValidity}
-                  className="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg cursor-pointer transition-colors"
-                >
-                  Calculate Due Date
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Input
-              label="Expiry / Due Date"
-              type="date"
-              required={documentType !== 'RC'}
-              value={expiryDate}
-              onChange={(e) => setExpiryDate(e.target.value)}
-              helperText="Determines renewal status & alerts"
-            />
-
-            <Input
-              label="Amount / Fee / Premium (₹)"
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value ? Number(e.target.value) : '')}
-              placeholder="e.g. 14500"
-            />
-
-            <Input
-              label="Reminder Notice (Days)"
-              type="number"
-              value={reminderDays}
-              onChange={(e) => setReminderDays(Number(e.target.value))}
-              helperText="Flags 'Due Soon' this many days prior"
-            />
-          </div>
-        </div>
-
-        {/* File attachment */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-            Attach Document Copy (PDF / Scan)
-          </label>
-          <div className="border border-dashed border-slate-300 rounded-lg p-3 text-center hover:bg-slate-50 transition-colors">
-            <input
-              type="file"
-              id="docFileUpload"
-              className="hidden"
-              accept=".pdf,.png,.jpg,.jpeg"
-              onChange={(e) => {
-                if (e.target.files && e.target.files[0]) {
-                  setFileName(e.target.files[0].name);
-                }
-              }}
-            />
-            <label
-              htmlFor="docFileUpload"
-              className="cursor-pointer text-xs flex flex-col items-center justify-center text-slate-600 gap-1"
-            >
-              <FileUp className="w-5 h-5 text-blue-600" />
-              <span className="font-semibold text-blue-600">
-                {fileName ? fileName : 'Click to attach document scan or receipt'}
-              </span>
-              <span className="text-[11px] text-slate-400">PDF, JPG, or PNG up to 15MB</span>
+        {/* PRIMARY FOCUS: Expiry / Due Date */}
+        <div className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <span>Expiry / Due Date</span>
+              <span className="text-rose-500">*</span>
             </label>
+            <span className="text-[11px] text-blue-600 font-medium">Auto-triggers renewal alerts</span>
           </div>
-        </div>
-
-        {/* Notes */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-            Operational Notes
-          </label>
-          <textarea
-            rows={2}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Add any specific conditions, endorsement notes, or client instructions..."
-            className="w-full rounded-lg border border-slate-300 p-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600"
+          <Input
+            type="date"
+            required={documentType !== 'RC'}
+            value={expiryDate}
+            onChange={(e) => setExpiryDate(e.target.value)}
+            className="bg-slate-50/50 focus:bg-white font-mono font-bold text-sm"
           />
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-          <Button type="button" variant="secondary" onClick={onClose}>
+        {/* PRIMARY FOCUS: Real File Upload & Attachment */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold text-slate-800">
+              Attach Document Copy / Digital Scan
+            </label>
+            <span className="text-[11px] text-slate-400">PDF, JPG, PNG up to 15MB</span>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            id="docFileUpload"
+            className="hidden"
+            accept=".pdf,.png,.jpg,.jpeg,.webp"
+            onChange={handleFileChange}
+          />
+
+          {fileName ? (
+            <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs transition-all shadow-xs">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div className="overflow-hidden">
+                  <div className="font-bold text-slate-900 truncate max-w-xs sm:max-w-sm">
+                    {fileName}
+                  </div>
+                  <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1 mt-0.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>File attached and ready {fileSize && `(${fileSize})`}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <label
+                  htmlFor="docFileUpload"
+                  className="px-2.5 py-1 text-xs font-bold text-blue-600 hover:bg-blue-100/60 rounded-lg cursor-pointer transition-colors"
+                >
+                  Change
+                </label>
+                <button
+                  type="button"
+                  onClick={handleRemoveFile}
+                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                  title="Remove file"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <label
+              htmlFor="docFileUpload"
+              className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/40 hover:bg-blue-50/20 rounded-2xl p-4 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-blue-50 group-hover:bg-blue-100 text-blue-600 flex items-center justify-center transition-colors">
+                <FileUp className="w-5 h-5" />
+              </div>
+              <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
+                Click or drag &amp; drop document scan or policy PDF
+              </span>
+              <span className="text-[11px] text-slate-400">Stores digital copy for office reference</span>
+            </label>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+          <Button type="button" variant="secondary" onClick={onClose} className="rounded-xl px-4 text-xs font-semibold">
             Cancel
           </Button>
-          <Button type="submit" variant="primary">
+          <Button type="submit" variant="primary" isLoading={isSaving} className="rounded-xl px-5 text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/20">
             {initialDocument ? 'Update Document' : 'Save Document'}
           </Button>
         </div>

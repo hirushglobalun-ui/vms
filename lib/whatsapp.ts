@@ -1,4 +1,3 @@
-import { format } from 'date-fns';
 import { getDocumentTypeName } from './renewals/engine';
 import { DocumentType } from './types';
 

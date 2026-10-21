@@ -59,19 +59,11 @@ export function Sidebar({
       adminOnly: false,
     },
     {
-      label: 'Renewals',
-      href: '/renewals',
-      icon: RotateCcw,
-      badge: overdueCount > 0 ? `${overdueCount}` : undefined,
-      badgeVariant: 'danger' as const,
-      adminOnly: false,
-    },
-    {
       label: 'Tasks',
       href: '/tasks',
       icon: CheckSquare,
-      badge: pendingTaskCount > 0 ? `${pendingTaskCount}` : undefined,
-      badgeVariant: 'info' as const,
+      badge: pendingTaskCount > 0 ? `${pendingTaskCount}` : (overdueCount > 0 ? `${overdueCount}` : undefined),
+      badgeVariant: overdueCount > 0 ? ('danger' as const) : ('info' as const),
       adminOnly: false,
     },
     {
@@ -91,20 +83,20 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        'w-64 bg-white text-slate-800 flex flex-col border-r border-slate-200/90 shrink-0 h-screen sticky top-0 shadow-2xs',
+        'w-60 bg-white text-slate-800 flex flex-col border-r border-slate-200/90 shrink-0 h-screen sticky top-0 shadow-2xs',
         className
       )}
     >
       {/* Brand Header */}
-      <div className="h-16 flex items-center px-5 border-b border-slate-100 gap-3 bg-white shrink-0">
-        <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
-          <CarFront className="w-5 h-5" />
+      <div className="h-14 flex items-center px-4 border-b border-slate-100 gap-2.5 bg-white shrink-0">
+        <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
+          <CarFront className="w-4.5 h-4.5" />
         </div>
         <div>
           <h1 className="font-bold text-sm tracking-tight text-slate-900 leading-tight">
             Apex Motor
           </h1>
-          <p className="text-[11px] text-slate-500 font-medium">Renewal Management</p>
+          <p className="text-[10px] text-slate-500 font-medium">Renewal Management</p>
         </div>
       </div>
 

@@ -125,10 +125,10 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Top Banner / Welcome Card */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white via-slate-50 to-blue-50/40 p-5 sm:p-7 border border-slate-200/90 shadow-sm">
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-white via-slate-50 to-blue-50/40 p-4 sm:p-5.5 border border-slate-200/90 shadow-2xs">
         <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
         
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 relative z-10">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 sm:gap-5 relative z-10">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-1.5">
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200">
@@ -140,7 +140,7 @@ export default function DashboardPage() {
               </span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
               {isAdmin ? 'Automobile Consultancy Overview' : `Welcome, ${currentUser?.name}`}
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">
@@ -151,11 +151,11 @@ export default function DashboardPage() {
           </div>
 
           {/* Quick Actions Bar */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             <Button
               variant="primary"
               onClick={() => setIsVehicleModalOpen(true)}
-              className="gap-2 shadow-sm shadow-blue-500/20"
+              className="gap-2 shadow-xs shadow-blue-500/20 text-xs py-2 px-3 sm:px-4"
             >
               <Sparkles className="w-4 h-4 text-amber-300" />
               <span>Add Vehicle & Scan RC</span>
@@ -164,7 +164,7 @@ export default function DashboardPage() {
             <Button
               variant="secondary"
               onClick={() => setIsTaskModalOpen(true)}
-              className="gap-1.5 bg-white hover:bg-slate-50 border-slate-200"
+              className="gap-1.5 bg-white hover:bg-slate-50 border-slate-200 text-xs py-2 px-3 sm:px-4"
             >
               <CheckSquare className="w-4 h-4 text-slate-600" />
               <span>New Task</span>
@@ -174,7 +174,7 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Card 1: Clients */}
         <Link href="/clients" className="block group">
           <div className="h-full p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-md hover:border-blue-300 transition-all">
